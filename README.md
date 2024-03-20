@@ -31,25 +31,15 @@ create_model(string_model): Creates models for anomaly detection.
 Supported string_model options:
 
 * 'KMeans'
-
 * 'IsolationForest'
-
 * 'SVM'
-
 * 'LOF'
-
 * 'conv1d'
-
 * 'conv2d'
-
 * 'conv3d'
-
 * 'GRU1D'
-
 * 'GRU2D'
-
 * 'LSTM1D'
-
 * 'LSTM2D'
 
 
