@@ -2,14 +2,17 @@
 This library provides tools for anomaly detection in multi-dimensional datasets. It includes methods for data preprocessing, model creation, and anomaly detection using various algorithms.
 
 ## Usage
-###Loading and Preprocessing Data
+### Loading and Preprocessing Data
 
 ```
 det = detector()
 det.load_preprocess('path_to_file.xlsx', sens_num)
 
 ```
-`load_preprocess(path, sens_num)`: Reads data from an Excel file and preprocesses it. `sens_num` specifies the number of sheets to load.
+`load_preprocess(path, sens_num)`: Reads data from an Excel file and preprocesses it. 
+
+`sens_num` specifies the number of sheets to load.
+
 ### Reshaping Data
 ```
 det.reshape_tensor(temporal_indices, spatial_indices)
@@ -27,17 +30,27 @@ create_model(string_model): Creates models for anomaly detection.
 `create_deep_model(string_model)`: Creates deep learning models for anomaly detection.
 Supported string_model options:
 
-'KMeans'
-'IsolationForest'
-'SVM'
-'LOF'
-'conv1d'
-'conv2d'
-'conv3d'
-'GRU1D'
-'GRU2D'
-'LSTM1D'
-'LSTM2D'
+* 'KMeans'
+
+* 'IsolationForest'
+
+* 'SVM'
+
+* 'LOF'
+
+* 'conv1d'
+
+* 'conv2d'
+
+* 'conv3d'
+
+* 'GRU1D'
+
+* 'GRU2D'
+
+* 'LSTM1D'
+
+* 'LSTM2D'
 
 
 ### Fitting Models
@@ -49,7 +62,9 @@ det.fit_ridge()
 ```
 
 `fit_model()`: Fits the selected model to the data.
+
 `fit_deep_model()`: Fits deep learning models to the data.
+
 `fit_ridge()`: Fits a Ridge model to the data.
 
 
@@ -63,9 +78,13 @@ det.lof_anomalies()
 ```
 
 `detect_deep_anomalies()`: Detects anomalies using deep learning models.
+
 `KMeans_anomalies()`: Detects anomalies using KMeans clustering.
+
 `forest_svm_anomalies()`: Detects anomalies using SVM or Isolation Forest.
+
 `lof_anomalies()`: Detects anomalies using Local Outlier Factor.
+
 ## Example
 ```
 from anomaly_detection import detector
@@ -92,15 +111,17 @@ You can install the library using pip:
 
 ```
 pip install anomaly-detection-library
-Requirements
-Python 3.6+
-TensorFlow
-Scikit-learn
-Pandas
-NumPy
-Matplotlib
-Seaborn
 ```
+
+## Requirements
+* Python 3.6+
+* TensorFlow
+* Scikit-learn
+* Pandas
+* NumPy
+* Matplotlib
+* Seaborn
+
 
 For deep learning models, you may need additional packages such as Keras.
 
