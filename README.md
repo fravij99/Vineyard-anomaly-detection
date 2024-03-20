@@ -98,10 +98,10 @@ det.forest_svm_anomalies()
 ```
 
 ## Installation
-You can install the library using pip:
+You can clone the repository using the command:
 
 ```
-pip install anomaly-detection-library
+git clone git@github.com:fravij99/Vineyard-anomaly-detection.git
 ```
 
 ## Requirements
