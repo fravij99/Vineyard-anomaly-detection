@@ -28,7 +28,8 @@ create_model(string_model): Creates models for anomaly detection.
 ```
 
 `create_deep_model(string_model)`: Creates deep learning models for anomaly detection.
-Supported string_model options:
+
+Supported `string_model options`:
 
 * 'KMeans'
 * 'IsolationForest'
