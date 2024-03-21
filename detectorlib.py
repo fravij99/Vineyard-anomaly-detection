@@ -39,10 +39,7 @@ from keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Lambda, Reshape, 
 from sklearn.linear_model import Ridge
 from sklearn.linear_model import LinearRegression
 from sklearn.neighbors import LocalOutlierFactor
-from ruptures.metrics import hausdorff
-from ruptures.costs import cost_normal, cost_constant
-from ruptures.detect import bocd
-from ruptures.utils import pairwise
+
 
 
 
@@ -102,8 +99,6 @@ class detector():
             self.model = OneClassSVM(gamma='auto')
         elif string_model == 'LOF':
             self.model = LocalOutlierFactor()
-        elif self.model == 'bayesian':
-            self.model = bocd(model='normal')
         else:
             raise ValueError('Model name not recognized')
       except ValueError as e:
