@@ -123,7 +123,9 @@ This library is provided under the MIT License.
 Contributions and feedback are welcome! Please feel free to open issues or submit pull requests.
 
 ## Author
-Developed by [Francesco Villa]
+Developed by [Francesco Villa][fravi]
 
 ## Contact
 For questions or support, contact [fravilla30@gmail.com] or [francesco.villa6@studenti.unimi.it].
+
+[fravi]: https://github.com/fravij99
