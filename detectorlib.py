@@ -239,10 +239,11 @@ class detector():
   
   def KMeans_anomalies(self):
     distances = self.model.transform(self.df)
-    
+
     # 3. Calcolo della soglia
     mean_distance = np.mean(np.min(distances, axis=1))
     std_distance = np.std(np.min(distances, axis=1))
+    
     threshold = mean_distance + 2 * std_distance  # Esempio: soglia come due deviazioni standard sopra la media
 
     # 4. Identificazione delle anomalie
