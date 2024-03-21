@@ -39,6 +39,11 @@ from keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Lambda, Reshape, 
 from sklearn.linear_model import Ridge
 from sklearn.linear_model import LinearRegression
 from sklearn.neighbors import LocalOutlierFactor
+from ruptures.metrics import hausdorff
+from ruptures.costs import cost_normal, cost_constant
+from ruptures.detect import bocd
+from ruptures.utils import pairwise
+
 
 
 '''In this class we have to set the local variables to assign ath every index of our notations'''
@@ -97,6 +102,8 @@ class detector():
             self.model = OneClassSVM(gamma='auto')
         elif string_model == 'LOF':
             self.model = LocalOutlierFactor()
+        elif self.model == 'bayesian':
+            self.model = bocd(model='normal')
         else:
             raise ValueError('Model name not recognized')
       except ValueError as e:
@@ -243,7 +250,7 @@ class detector():
     # 3. Calcolo della soglia
     mean_distance = np.mean(np.min(distances, axis=1))
     std_distance = np.std(np.min(distances, axis=1))
-    
+
     threshold = mean_distance + 2 * std_distance  # Esempio: soglia come due deviazioni standard sopra la media
 
     # 4. Identificazione delle anomalie
