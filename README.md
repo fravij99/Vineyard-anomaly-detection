@@ -1,5 +1,8 @@
 # README - Anomaly Detection Library
-This library provides tools for anomaly detection in multi-dimensional datasets. It includes methods for data preprocessing, model creation, and anomaly detection using various algorithms.
+Hey there! 
+
+This is my master thesis repository. 
+This library provides tools for anomaly detection in multi-dimensional datasets came form iGrape projects. It includes methods for data preprocessing, model creation, and anomaly detection using various algorithms.
 
 ## Usage
 ### Loading and Preprocessing Data
@@ -52,11 +55,11 @@ det.fit_deep_model()
 det.fit_ridge()
 ```
 
-`fit_model()`: Fits the selected model to the data.
+`fit_model()`: Fits the selected statistical model to the data.
 
 `fit_deep_model()`: Fits deep learning models to the data.
 
-`fit_ridge()`: Fits a Ridge model to the data.
+`fit_linear()`: Fits a Linear Regressor model to the data.
 
 
 ### Anomaly Detection
