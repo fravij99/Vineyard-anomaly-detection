@@ -39,13 +39,12 @@ from keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Lambda, Reshape, 
 from sklearn.linear_model import Ridge
 from sklearn.linear_model import LinearRegression
 from sklearn.neighbors import LocalOutlierFactor
-
-
+import hyperopt
+from datetime import timedelta
 
 
 '''In this class we have to set the local variables to assign ath every index of our notations'''
 class detector():
-
 
   def tuple_prod(self, tupla):
     prodotto = 1
@@ -53,16 +52,19 @@ class detector():
         prodotto *= dim
     return prodotto
   
+
   '''Reads from excel file the data and append the sheets to the third index of the tensor: (temporal samples, features, sensors)'''
   def load_preprocess(self, path, sens_num):
-    self.df=[]
-    for sheet_num in range(1, sens_num):  # 18 fogli numerati da 1 a 18
-      sheet_df = pd.read_excel(path, sheet_name=sheet_num)
-      self.df.append(sheet_df)
-      self.df[sheet_num-1]=self.df[sheet_num-1].drop(['timestamp','sensor', 'off_ch1' , 'off_ch2', 'off_ch3' , 'off_ch4'], axis=1)
-    self.df=np.array(self.df)
-    self.df=(self.df-self.df.min())/(self.df.max()-self.df.min())
-    self.df=self.df.transpose(1, 0, 2)
+        self.df = []
+        for sheet_num in range(sens_num):  # Change to range(18) when you have all
+            sheet_df = pd.read_excel(path, sheet_name=sheet_num)
+            # Dropping unnecessary columns
+            sheet_df = sheet_df.drop(['Unnamed: 0', 'timestamp', 'sensor', 'off_ch1', 'off_ch2', 'off_ch3', 'off_ch4'], axis=1)
+            self.df.append(sheet_df)
+        
+        self.df = np.array(self.df)
+        self.df = (self.df - self.df.min()) / (self.df.max() - self.df.min())
+        self.df = self.df.transpose(1, 0, 2)
 
   
   '''Given the desired index from the main, it reshape the df into a tensor as the user wants'''
@@ -70,16 +72,15 @@ class detector():
     if temporal_indices[0] == 0 and temporal_indices[1] == 0:
         print('Please set at least one temporal index different from 0')
         return
-
     # Verifica se almeno uno degli indici spaziali è diverso da zero
     if spatial_indices[0] == 0 and spatial_indices[1] == 0 and spatial_indices[2] == 0:
         print('Please set at least one spatial index different from 0')
         return
-    # define new indices without zeros
+    # definisce nuovi inidici diversi da zero
     new_temporal_indices = [x for x in temporal_indices if x != 0]
     new_spatial_indices = [x for x in spatial_indices if x != 0]
 
-    # Verificare se ci sono zeri e effettuare la reshape
+    # Verifica se ci sono zeri e effettuare il reshape
     if 0 not in temporal_indices and 0 not in spatial_indices:
     # Se non ci sono zeri, esegui la reshape con tutti gli indici
       self.df = self.df.reshape(temporal_indices[0], temporal_indices[1], spatial_indices[0], spatial_indices[1], spatial_indices[2])
@@ -92,35 +93,31 @@ class detector():
   def create_model(self, string_model):
       try:
         if string_model == 'KMeans':
-            self.model = KMeans(n_clusters=5)
+            self.str_model=string_model
+            self.model = KMeans(n_clusters=5) # 7 parameters
         elif string_model == 'IsolationForest':
-            self.model = IsolationForest(n_estimators=100, max_samples='auto', contamination=float(0.2), random_state=42)
+            self.str_model=string_model
+            self.model = IsolationForest(n_estimators=100, max_samples='auto', contamination=float(0.2), random_state=42) # 8 parameters some bool
         elif string_model == 'SVM':
-            self.model = OneClassSVM(gamma='auto')
+            self.str_model=string_model
+            self.model = OneClassSVM(gamma='auto')  # 7 parameters
         elif string_model == 'LOF':
-            self.model = LocalOutlierFactor()
+            self.str_model=string_model
+            self.model = LocalOutlierFactor() # 8 parameters some useless
+        elif string_model == 'linear':
+            self.str_model=string_model
+            self.model = LinearRegression() # 3 parameters only bool
         else:
             raise ValueError('Model name not recognized')
       except ValueError as e:
         print(f"Error creating model: {e}")
         return None
 
-  def fit_deep_model(self):
-    self.model.compile(optimizer='adam', loss='mean_squared_error')
-    history= self.model.fit(self.df, self.df, epochs=20, batch_size=32, validation_split=0.1, verbose=1)
-    plot_history(history)
-    plt.show()
-
-  def fit_model(self):
-      self.model.fit(self.df)
-
-  def fit_ridge(self):
-    self.model.fit(self.df, self.df)
-
 
   def create_deep_model(self, string_model):
     try:
       if string_model == 'conv1d':
+        self.str_model=string_model
         self.model = keras.Sequential([
           Conv1D(32, (3), activation='relu', padding='same', input_shape=(int(self.df.shape[1]), 1)),
           MaxPooling1D((2)),
@@ -130,6 +127,7 @@ class detector():
           Lambda(lambda x: x, output_shape=lambda s: s)  # Aggiungi questo layer Lambda
     ])
       elif string_model == 'conv2d':
+        self.str_model=string_model
         self.model = keras.Sequential([
         Conv2D(32, (3, 3), activation='relu', padding='same', input_shape=(self.df.shape[1], self.df.shape[2], 1)),
         MaxPooling2D((2, 2)),
@@ -139,6 +137,7 @@ class detector():
         Reshape((self.df.shape[1], self.df.shape[2]))  # Modifica qui la dimensione dell'output
     ])
       elif string_model == 'conv3d':
+        self.str_model=string_model
         self.model = keras.Sequential([
           Conv3D(32, (3, 3, 3), activation='relu', padding='same', input_shape=(self.df.shape[1], self.df.shape[2], self.df.shape[3], 1)),
           MaxPooling3D((2, 2, 2)),
@@ -151,6 +150,7 @@ class detector():
     ])
         
       elif string_model == 'GRU1D':
+        self.str_model=string_model
         self.model = keras.Sequential([
           GRU(64, input_shape=((self.df.shape[1]), 1), return_sequences=True),
           GRU(32),
@@ -159,6 +159,7 @@ class detector():
     ])
         
       elif string_model == 'GRU2D':
+        self.str_model=string_model
         self.model = keras.Sequential([
           GRU(64, input_shape=((self.df.shape[1:])), return_sequences=True),
           GRU(32),
@@ -168,6 +169,7 @@ class detector():
     ])
         
       elif string_model == 'LSTM1D':
+        self.str_model=string_model
         self.model = keras.Sequential([
           LSTM(64, input_shape=((self.df.shape[1]), 1), return_sequences=True),
           LSTM(32),
@@ -176,6 +178,7 @@ class detector():
     ])
         
       elif string_model == 'LSTM2D':
+        self.str_model=string_model
         self.model = keras.Sequential([
           LSTM(64, input_shape=((self.df.shape[1:])), return_sequences=True),
           LSTM(32),
@@ -189,88 +192,263 @@ class detector():
     except ValueError as e:
           print(f"Error creating model: {e}")
           return None
+    
 
 
+  def fit_deep_model(self):
+    self.model.compile(optimizer='adam', loss='mean_squared_error')
+    history= self.model.fit(self.df, self.df, epochs=150, batch_size=32, validation_split=0.1, verbose=1)
+    plot_history(history)
+    plt.show()
 
-  def detect_deep_anomalies(self):
+  def fit_model(self):
+      self.model.fit(self.df)
+
+  def fit_linear_model(self):
+    self.model.fit(self.df, self.df)
+ 
+
+  def detect_deep_anomalies_unsup(self):
     reconstructed = self.model.predict(self.df)
     mse = np.mean(np.power(self.df - reconstructed, 2), axis=1)
     rate=[]
     parameters = np.linspace(mse.min(), mse.max(), 1000)
     for i in range(len(parameters)):
       anomal = np.where(mse > parameters[i])
-
       if len(self.df.shape) == 2:
         rate.append((len(anomal[0]))/(self.df.shape[0]))
       elif len(self.df.shape) == 3:
-        rate.append((len(anomal[0]))/(self.df.shape[0]*self.df.shape[1]))
+        rate.append((len(anomal[0]))/(self.df.shape[0]*self.df.shape[2]))
       elif len(self.df.shape) == 4:
-        rate.append((len(anomal[0]))/(self.df.shape[0]*self.df.shape[1]*self.df.shape[2]))        
+        rate.append((len(anomal[0]))/(self.df.shape[0]*self.df.shape[3]*self.df.shape[2]))        
 
     sns.set_style('darkgrid')
     plt.plot(parameters, rate)
     plt.scatter(parameters, rate)
+    plt.title('Anomaly rate trend for combination: ' + str(self.str_model) + str(self.df.shape))
     plt.xlabel('mse threshold')
     plt.ylabel('anomaly rate ')
     plt.show()
-
+    # calcolo derivata
     der = np.gradient(rate)
-
     ind_der = np.argmax(der)
-
-        # Plot della derivata
+    # Plot della derivata
     plt.plot(parameters, der)
     plt.xlabel('mse threshold')
     plt.ylabel('derivative')
     plt.show()
-
-    print("Indice della derivata massima:", ind_der)
-    print("Valore in quel punto:", parameters[ind_der])
-
+    print("Index max derivative:", ind_der)
+    print("parameter in that point:", parameters[ind_der])
     anomalies_indices=[]
-    
-    '''print((mse.shape))
-    for i in range(len(mse)):
-       for j in range(len(mse[i])):
-        if(mse[i][j]>rate[ind_der]):
-            anomalies_indices.append([i,j])'''
-    
     anomalies_indices = np.where(mse > parameters[ind_der])
-    print('Gli indici delle anomalie risultano essere:', anomalies_indices)
+    print('Anomaly indices:', anomalies_indices)
     return(anomalies_indices)
   
+  def anomalies_sup(self):
+    if self.str_model == 'SVM':
+        # Calcoliamo i punteggi di anomalia per ogni campione nel dataset
+        punteggi_anomalie = self.model.decision_function(self.df)
+
+        # Definiamo la percentuale di anomalie nel dataset
+        percentuale_anomalie = 0.05  # 5%
+
+        # Calcoliamo il numero di campioni anomali
+        num_anomalie = int(percentuale_anomalie * len(self.df))
+
+        # Troviamo gli indici dei campioni più anomali
+        indici_anomalie = np.where(punteggi_anomalie < 0)[0]  # Supponendo che gli indici delle anomalie siano dove i punteggi sono negativi
+
+        # Ordiniamo gli indici in base ai punteggi di anomalia
+        indici_anomalie_ordinati = np.argsort(punteggi_anomalie[indici_anomalie])
+
+        # Selezioniamo solo i primi 'num_anomalie' indici ordinati
+        indici_anomalie_selezionati = indici_anomalie[indici_anomalie_ordinati[:num_anomalie]]
+
+        self.anomalies_indices = indici_anomalie_selezionati
+        print(f"Indici delle anomalie per forma {self.df.shape}:", self.anomalies_indices)
+
+
+
+
   def KMeans_anomalies(self):
     distances = self.model.transform(self.df)
-
-    # 3. Calcolo della soglia
     mean_distance = np.mean(np.min(distances, axis=1))
     std_distance = np.std(np.min(distances, axis=1))
-
-    threshold = mean_distance + 2 * std_distance  # Esempio: soglia come due deviazioni standard sopra la media
-
-    # 4. Identificazione delle anomalie
+    threshold = mean_distance + 2 * std_distance  # Esempio: soglia come due dev std
     anomaly_indices = np.where(np.min(distances, axis=1) > threshold)[0]
     anomalies = self.df[anomaly_indices]
-
     print("Indici delle anomalie:", anomaly_indices)
 
 
-  def forest_svm_anomalies(self):
-    anomaly_scores = self.model.decision_function(self.df)  # Calcolo degli score di anomalia per il dataset di test
+  def forest_svm_anomalies_unsup(self):
+    anomaly_scores = self.model.decision_function(self.df)  # Calcolo degli score 
+    threshold = np.linspace(-10, 10, 1000)
 
-# 3. Definizione della soglia -8.5 per SVM
-    threshold = -8.5  # Esempio: definizione della soglia per identificare le anomalie
+    rate=[]
+    for i in range(len(threshold)):
+      anomal = np.where(anomaly_scores > threshold[i])
+      rate.append((len(anomal[0]))/(self.df.shape[0]))
 
-# 4. Identificazione delle anomalie
-    anomaly_indices = np.where(anomaly_scores < threshold)[0]
-    anomalies = self.df[anomaly_indices]
+    sns.set_style('darkgrid')
+    plt.plot(threshold, rate)
+    plt.scatter(threshold, rate)
+    plt.title('Anomaly rate trend for combination: ' + str(self.str_model) + str(self.df.shape))
+    plt.xlabel('mse threshold')
+    plt.ylabel('anomaly rate ')
+    plt.savefig('Anomaly rate trend for combination: ' + str(self.str_model) + str(self.df.shape) + '.png')
+    plt.show()
+    # calcolo derivata
+    der = np.gradient(rate)
+    ind_der = np.argmin(der)
+    # Plot della derivata
+    plt.plot(threshold, der)
+    plt.xlabel('mse threshold')
+    plt.ylabel('derivative')
+    plt.title('Anomaly rate derivative trend for combination: ' + str(self.str_model) + str(self.df.shape))
+    plt.savefig('Anomaly rate derivative trend for combination: ' + str(self.str_model) + str(self.df.shape) + '.png')
+    plt.show()
+    print("Index max derivative:", ind_der)
+    print("parameter in that point:", threshold[ind_der])
+    self.anomalies_indices=[]
+    self.anomalies_indices = np.where(anomaly_scores > threshold[ind_der])
+    print('Anomaly indices:', self.anomalies_indices)
+    return(self.anomalies_indices)
 
-    print("Indici delle anomalie:", len(anomaly_indices))
+
 
   def lof_anomalies(self):
-
     # Calcolo degli score di anomalia per il dataset di tes
     anomalies = self.model.fit_predict(self.df)
     anomaly_indices = np.where(anomalies < 0)[0]
     print("Indici delle anomalie:", anomaly_indices)
+
+
+
+  def linear_anomalies(self):
+    
+    reconstructed = self.model.predict(self.df)
+    mse = np.mean(np.power(self.df - reconstructed, 2), axis=1)
+    rate=[]
+    parameters = np.linspace(mse.min(), mse.max(), 1000)
+    print(mse.min(), mse.max())
+    for i in range(len(parameters)):
+      anomal = np.where(mse > parameters[i])
+      rate.append((len(anomal[0]))/(self.df.shape[0]))
+
+    sns.set_style('darkgrid')
+    plt.plot(parameters, rate)
+    plt.scatter(parameters, rate)
+    plt.title('Anomaly rate trend for combination: ' + str(self.str_model) + str(self.df.shape))
+    plt.xlabel('mse threshold')
+    plt.ylabel('anomaly rate ')
+    plt.savefig('Anomaly rate trend for combination: ' + str(self.str_model) + str(self.df.shape) + '.png')
+    plt.show()
+    # calcolo derivata
+    der = np.gradient(rate)
+    ind_der = np.argmin(der)
+    # Plot della derivata
+    plt.plot(parameters, der)
+    plt.xlabel('mse threshold')
+    plt.ylabel('derivative')
+    plt.show()
+    print("Index max derivative:", ind_der)
+    print("parameter in that point:", parameters[ind_der])
+    self.anomalies_indices=[]
+    self.anomalies_indices = np.where(mse > parameters[ind_der])
+    print('Anomaly indices:', self.anomalies_indices)
+    return(self.anomalies_indices)
+
+
+  def save_anomaly_indices(self):
+    with open('anomalies_' + str(self.model) + str(self.df.shape) + '.txt', 'w') as file:
+        for indice in self.anomalies_indices:
+            file.write(f"{indice}\n")
+
+
+
+  def stamp_all_shape_anomalies(self, possible_shapes):
+    for temporal_indices, spatial_indices in possible_shapes:
+      self.reshape_tensor(temporal_indices, spatial_indices)
+      self.fit_model()
+      anomalies=self.anomalies_sup()
+      self.save_anomaly_indices()
+
+
+  def hyperopt_statistical_models(self, params):
+    return
+
+
+
+class sheet:
+    def __init__(self):
+        pass
+
+    def load_timestamps(self, path, sens_num):
+        self.df = []
+        for sheet_num in range(sens_num):  # Change to range(18) when you have all
+            sheet_df = pd.read_excel(path, sheet_name=sheet_num)
+            # Dropping unnecessary columns
+            sheet_df = sheet_df['timestamp']
+            self.df.append(sheet_df)
+        return self.df
+       
+
+    def get_date(self, timestamp):
+        return pd.to_datetime(timestamp, dayfirst=True).date()
+
+
+    def find_discontinuity(self, *args):
+        prev_date = None
+        discs=[]
+        dates=[]
+        for idx, timestamps in enumerate(args):
+            for i, timestamp in enumerate(tqdm(timestamps, desc=f'Analizing array {idx}', unit='timestamp')):
+                curr_date = self.get_date(timestamp)
+
+                if prev_date is None:
+                    prev_date = curr_date
+                    continue
+
+                # Controlla se la data corrente è esattamente il giorno successivo alla data precedente
+                if curr_date != prev_date + timedelta(days=1) and curr_date != prev_date + timedelta(days=0):
+                    print(f"Discontinuity found on array {idx} on date : {prev_date}")
+                    print(f"Delta days: {abs(curr_date - prev_date).days}")
+                    discs.append(idx)
+                    dates.append(prev_date)
+                prev_date = curr_date
+
+            # Resetta prev_date alla fine di ogni array per confrontare solo le date tra gli array
+            prev_date = None
+        return discs, dates
+
+
+class printer():
+  def __init__(self):
+        pass
+  
+  def load(self, path, sens_num):
+    self.df = []
+    for sheet_num in range(sens_num):  # Change to range(18) when you have all
+            sheet_df = pd.read_excel(path, sheet_name=sheet_num)
+
+            sheet_df = sheet_df.drop(['Unnamed: 0', 'off_ch1', 'off_ch2', 'off_ch3', 'off_ch4'], axis=1)
+            self.df.append(sheet_df)
+
+
+  def print_all(self):
+    sns.set_style('darkgrid')
+
+    for i in tqdm(range(len(self.df)), desc="Elaborazione"):
+      plt.figure(figsize=(15,10))
+
+      for col in self.df[i].iloc[:, 2:].columns:
+        plt.plot(self.df[i]['timestamp'], self.df[i][col], label=col)
+
+      plt.title(self.df[i]['sensor'].iloc[0])
+      plt.xlabel('Time')
+      plt.ylabel('Interactance')
+      plt.legend()
+      plt.savefig(f'graphs/sensor_{self.df[i]["sensor"].iloc[0]}.png')
+      plt.close() 
+
 
