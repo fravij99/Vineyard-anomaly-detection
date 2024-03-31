@@ -244,123 +244,70 @@ class detector():
     print('Anomaly indices:', anomalies_indices)
     return(anomalies_indices)
   
+
+
+  def fit_model(self):
+    self.model.fit(self.df)
+
   def anomalies_sup(self):
+    percentuale_anomalie = 0.05  # 5%
+
     if self.str_model == 'SVM':
-        # Calcoliamo i punteggi di anomalia per ogni campione nel dataset
+        self.fit_model()  # Addestramento del modello SVM
         punteggi_anomalie = self.model.decision_function(self.df)
-
-        # Definiamo la percentuale di anomalie nel dataset
-        percentuale_anomalie = 0.05  # 5%
-
-        # Calcoliamo il numero di campioni anomali
         num_anomalie = int(percentuale_anomalie * len(self.df))
-
-        # Troviamo gli indici dei campioni più anomali
-        indici_anomalie = np.where(punteggi_anomalie < 0)[0]  # Supponendo che gli indici delle anomalie siano dove i punteggi sono negativi
-
-        # Ordiniamo gli indici in base ai punteggi di anomalia
+        indici_anomalie = np.where(punteggi_anomalie < 0)[0]  
         indici_anomalie_ordinati = np.argsort(punteggi_anomalie[indici_anomalie])
-
-        # Selezioniamo solo i primi 'num_anomalie' indici ordinati
         indici_anomalie_selezionati = indici_anomalie[indici_anomalie_ordinati[:num_anomalie]]
-
         self.anomalies_indices = indici_anomalie_selezionati
-        print(f"Indici delle anomalie per forma {self.df.shape}:", self.anomalies_indices)
+        print(f"Anomalies indices for {self.model} {self.df.shape}:", self.anomalies_indices)
 
+    elif self.str_model == 'KMeans':
+        self.fit_model()  # Addestramento del modello KMeans
+        distances = self.model.transform(self.df)
+        mean_distance = np.mean(np.min(distances, axis=1))
+        std_distance = np.std(np.min(distances, axis=1))
+        threshold = mean_distance + 2 * std_distance  # Esempio: soglia come due dev std
+        anomaly_indices = np.where(np.min(distances, axis=1) > threshold)[0]
+        num_anomalie = int(percentuale_anomalie * len(self.df))
+        anomaly_indices = np.argsort(distances)[::-1][:num_anomalie]
+        print(f"Anomalies indices for {self.model} {self.df.shape}:", self.anomalies_indices)
 
+    elif self.str_model == 'LOF':
+        self.fit_model()  # Addestramento del modello LOF
+        anomalies = self.model.fit_predict(self.df)
+        self.anomaly_indices = np.where(anomalies < 0)[0]
+        num_anomalie = int(percentuale_anomalie * len(self.df))
+        self.anomaly_indices = np.argsort(anomalies)[::-1][:num_anomalie]
+        print(f"Anomalies indices for {self.model} {self.df.shape}:", self.anomalies_indices)
 
+    elif self.str_model == 'IsolationForest':
+        self.fit_model()  # Addestramento del modello Isolation Forest
+        punteggi_anomalie = self.model.decision_function(self.df)
+        num_anomalie = int(percentuale_anomalie * len(self.df))
+        indici_anomalie = np.where(punteggi_anomalie < 0)[0]  
+        indici_anomalie_ordinati = np.argsort(punteggi_anomalie[indici_anomalie])
+        indici_anomalie_selezionati = indici_anomalie[indici_anomalie_ordinati[:num_anomalie]]
+        self.anomalies_indices = indici_anomalie_selezionati
+        print(f"Anomalies indices for {self.model} {self.df.shape}:", self.anomalies_indices)
 
-  def KMeans_anomalies(self):
-    distances = self.model.transform(self.df)
-    mean_distance = np.mean(np.min(distances, axis=1))
-    std_distance = np.std(np.min(distances, axis=1))
-    threshold = mean_distance + 2 * std_distance  # Esempio: soglia come due dev std
-    anomaly_indices = np.where(np.min(distances, axis=1) > threshold)[0]
-    anomalies = self.df[anomaly_indices]
-    print("Indici delle anomalie:", anomaly_indices)
+    elif self.str_model == 'linear':
+        self.fit_linear_model()  # Addestramento del modello di regressione lineare
+        residui = self.df - self.model.predict(self.df)
+        deviazione_standard = np.std(residui)
+        threshold = 2 * deviazione_standard
+        indici_anomalie = np.where(abs(residui) > threshold)[0]
+        num_anomalie = int(percentuale_anomalie * len(self.df))
+        indici_anomalie = np.argsort(abs(residui))[::-1][:num_anomalie]
+        print(f"Anomalies indices for {self.model} {self.df.shape}:", self.anomalies_indices)
 
+    else:
+        print("Unknown model")
 
-  def forest_svm_anomalies_unsup(self):
-    anomaly_scores = self.model.decision_function(self.df)  # Calcolo degli score 
-    threshold = np.linspace(-10, 10, 1000)
-
-    rate=[]
-    for i in range(len(threshold)):
-      anomal = np.where(anomaly_scores > threshold[i])
-      rate.append((len(anomal[0]))/(self.df.shape[0]))
-
-    sns.set_style('darkgrid')
-    plt.plot(threshold, rate)
-    plt.scatter(threshold, rate)
-    plt.title('Anomaly rate trend for combination: ' + str(self.str_model) + str(self.df.shape))
-    plt.xlabel('mse threshold')
-    plt.ylabel('anomaly rate ')
-    plt.savefig('Anomaly rate trend for combination: ' + str(self.str_model) + str(self.df.shape) + '.png')
-    plt.show()
-    # calcolo derivata
-    der = np.gradient(rate)
-    ind_der = np.argmin(der)
-    # Plot della derivata
-    plt.plot(threshold, der)
-    plt.xlabel('mse threshold')
-    plt.ylabel('derivative')
-    plt.title('Anomaly rate derivative trend for combination: ' + str(self.str_model) + str(self.df.shape))
-    plt.savefig('Anomaly rate derivative trend for combination: ' + str(self.str_model) + str(self.df.shape) + '.png')
-    plt.show()
-    print("Index max derivative:", ind_der)
-    print("parameter in that point:", threshold[ind_der])
-    self.anomalies_indices=[]
-    self.anomalies_indices = np.where(anomaly_scores > threshold[ind_der])
-    print('Anomaly indices:', self.anomalies_indices)
-    return(self.anomalies_indices)
-
-
-
-  def lof_anomalies(self):
-    # Calcolo degli score di anomalia per il dataset di tes
-    anomalies = self.model.fit_predict(self.df)
-    anomaly_indices = np.where(anomalies < 0)[0]
-    print("Indici delle anomalie:", anomaly_indices)
-
-
-
-  def linear_anomalies(self):
-    
-    reconstructed = self.model.predict(self.df)
-    mse = np.mean(np.power(self.df - reconstructed, 2), axis=1)
-    rate=[]
-    parameters = np.linspace(mse.min(), mse.max(), 1000)
-    print(mse.min(), mse.max())
-    for i in range(len(parameters)):
-      anomal = np.where(mse > parameters[i])
-      rate.append((len(anomal[0]))/(self.df.shape[0]))
-
-    sns.set_style('darkgrid')
-    plt.plot(parameters, rate)
-    plt.scatter(parameters, rate)
-    plt.title('Anomaly rate trend for combination: ' + str(self.str_model) + str(self.df.shape))
-    plt.xlabel('mse threshold')
-    plt.ylabel('anomaly rate ')
-    plt.savefig('Anomaly rate trend for combination: ' + str(self.str_model) + str(self.df.shape) + '.png')
-    plt.show()
-    # calcolo derivata
-    der = np.gradient(rate)
-    ind_der = np.argmin(der)
-    # Plot della derivata
-    plt.plot(parameters, der)
-    plt.xlabel('mse threshold')
-    plt.ylabel('derivative')
-    plt.show()
-    print("Index max derivative:", ind_der)
-    print("parameter in that point:", parameters[ind_der])
-    self.anomalies_indices=[]
-    self.anomalies_indices = np.where(mse > parameters[ind_der])
-    print('Anomaly indices:', self.anomalies_indices)
-    return(self.anomalies_indices)
-
+  
 
   def save_anomaly_indices(self):
-    with open('anomalies_' + str(self.model) + str(self.df.shape) + '.txt', 'w') as file:
+    with open(f'anomalies/anomalies_' + str(self.model) + str(self.df.shape) + '.txt', 'w') as file:
         for indice in self.anomalies_indices:
             file.write(f"{indice}\n")
 
@@ -369,8 +316,7 @@ class detector():
   def stamp_all_shape_anomalies(self, possible_shapes):
     for temporal_indices, spatial_indices in possible_shapes:
       self.reshape_tensor(temporal_indices, spatial_indices)
-      self.fit_model()
-      anomalies=self.anomalies_sup()
+      self.anomalies_sup()
       self.save_anomaly_indices()
 
 
