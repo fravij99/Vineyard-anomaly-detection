@@ -13,7 +13,7 @@ possible_shapes=[
 #([41*11*16*4,0], [1, 0, 0])
 ]
 
-possible_models={'SVM', 'linear', 'KMeans', 'LOF', 'IsolationForest'}
+possible_models={'linear', 'KMeans', 'SVM', 'LOF', 'IsolationForest'}  #, 'linear', 'KMeans', 'SVM', 'LOF', 'IsolationForest', 
 det=detectorlib.detector()
 det.load_preprocess(path2, 4)
 

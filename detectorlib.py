@@ -56,6 +56,7 @@ class detector():
   '''Reads from excel file the data and append the sheets to the third index of the tensor: (temporal samples, features, sensors)'''
   def load_preprocess(self, path, sens_num):
         self.df = []
+        self.xlsx_path=path
         for sheet_num in range(sens_num):  # Change to range(18) when you have all
             sheet_df = pd.read_excel(path, sheet_name=sheet_num)
             # Dropping unnecessary columns
@@ -250,64 +251,69 @@ class detector():
     self.model.fit(self.df)
 
   def anomalies_sup(self):
-    percentuale_anomalie = 0.05  # 5%
+    anomaly_percentage = 0.05  # 5%
 
     if self.str_model == 'SVM':
-        self.fit_model()  # Addestramento del modello SVM
-        punteggi_anomalie = self.model.decision_function(self.df)
-        num_anomalie = int(percentuale_anomalie * len(self.df))
-        indici_anomalie = np.where(punteggi_anomalie < 0)[0]  
-        indici_anomalie_ordinati = np.argsort(punteggi_anomalie[indici_anomalie])
-        indici_anomalie_selezionati = indici_anomalie[indici_anomalie_ordinati[:num_anomalie]]
-        self.anomalies_indices = indici_anomalie_selezionati
+        self.fit_model()  # Training SVM model
+        anomaly_scores = self.model.decision_function(self.df)
+        num_anomalies = int(anomaly_percentage * len(self.df))
+        anomaly_indices = np.where(anomaly_scores < 0)[0]  
+        sorted_anomaly_indices = np.argsort(anomaly_scores[anomaly_indices])
+        selected_anomaly_indices = anomaly_indices[sorted_anomaly_indices[:num_anomalies]]
+        self.anomalies_indices = selected_anomaly_indices
         print(f"Anomalies indices for {self.model} {self.df.shape}:", self.anomalies_indices)
+        print(f"Number of anomalies: {len(self.anomalies_indices)}")
 
     elif self.str_model == 'KMeans':
-        self.fit_model()  # Addestramento del modello KMeans
+        self.fit_model()  # Training KMeans model
         distances = self.model.transform(self.df)
         mean_distance = np.mean(np.min(distances, axis=1))
         std_distance = np.std(np.min(distances, axis=1))
-        threshold = mean_distance + 2 * std_distance  # Esempio: soglia come due dev std
-        anomaly_indices = np.where(np.min(distances, axis=1) > threshold)[0]
-        num_anomalie = int(percentuale_anomalie * len(self.df))
-        anomaly_indices = np.argsort(distances)[::-1][:num_anomalie]
+        threshold = mean_distance + 2 * std_distance  # Example: threshold as two std devs
+        self.anomalies_indices = np.where(np.min(distances, axis=1) > threshold)[0]
+        num_anomalies = int(anomaly_percentage * len(self.df))
+        sorted_anomalies_indices = np.argsort(np.min(distances, axis=1))[::-1]
+        self.anomalies_indices = sorted_anomalies_indices[:num_anomalies]
         print(f"Anomalies indices for {self.model} {self.df.shape}:", self.anomalies_indices)
+        print(f"Number of anomalies: {len(self.anomalies_indices)}")
 
     elif self.str_model == 'LOF':
-        self.fit_model()  # Addestramento del modello LOF
+        self.fit_model()  # Training LOF model
         anomalies = self.model.fit_predict(self.df)
-        self.anomaly_indices = np.where(anomalies < 0)[0]
-        num_anomalie = int(percentuale_anomalie * len(self.df))
-        self.anomaly_indices = np.argsort(anomalies)[::-1][:num_anomalie]
+        self.anomalies_indices = np.where(anomalies < 0)[0]
+        num_anomalies = int(anomaly_percentage * len(self.df))
+        self.anomalies_indices = np.argsort(anomalies)[::-1][:num_anomalies]
         print(f"Anomalies indices for {self.model} {self.df.shape}:", self.anomalies_indices)
+        print(f"Number of anomalies: {len(self.anomalies_indices)}")
 
     elif self.str_model == 'IsolationForest':
-        self.fit_model()  # Addestramento del modello Isolation Forest
-        punteggi_anomalie = self.model.decision_function(self.df)
-        num_anomalie = int(percentuale_anomalie * len(self.df))
-        indici_anomalie = np.where(punteggi_anomalie < 0)[0]  
-        indici_anomalie_ordinati = np.argsort(punteggi_anomalie[indici_anomalie])
-        indici_anomalie_selezionati = indici_anomalie[indici_anomalie_ordinati[:num_anomalie]]
-        self.anomalies_indices = indici_anomalie_selezionati
+        self.fit_model()  # Training Isolation Forest model
+        anomaly_scores = self.model.decision_function(self.df)
+        num_anomalies = int(anomaly_percentage * len(self.df))
+        anomaly_indices = np.where(anomaly_scores < 0)[0]  
+        sorted_anomaly_indices = np.argsort(anomaly_scores[anomaly_indices])
+        selected_anomaly_indices = anomaly_indices[sorted_anomaly_indices[:num_anomalies]]
+        self.anomalies_indices = selected_anomaly_indices
         print(f"Anomalies indices for {self.model} {self.df.shape}:", self.anomalies_indices)
+        print(f"Number of anomalies: {len(self.anomalies_indices)}")
 
     elif self.str_model == 'linear':
-        self.fit_linear_model()  # Addestramento del modello di regressione lineare
-        residui = self.df - self.model.predict(self.df)
-        deviazione_standard = np.std(residui)
-        threshold = 2 * deviazione_standard
-        indici_anomalie = np.where(abs(residui) > threshold)[0]
-        num_anomalie = int(percentuale_anomalie * len(self.df))
-        indici_anomalie = np.argsort(abs(residui))[::-1][:num_anomalie]
+        self.fit_linear_model()  # Training linear regression model
+        mse = np.mean(np.power(self.df - self.model.predict(self.df), 2), axis=1)
+        percentile = np.percentile(np.abs(mse), (100*(1 - anomaly_percentage)))
+        # Trova gli indici delle righe con residui che superano il 95% percentile
+        self.anomalies_indices = np.where(np.abs(mse) > percentile)[0]
         print(f"Anomalies indices for {self.model} {self.df.shape}:", self.anomalies_indices)
+        print(f"Number of anomalies: {len(self.anomalies_indices)}")
+
 
     else:
         print("Unknown model")
 
-  
+
 
   def save_anomaly_indices(self):
-    with open(f'anomalies/anomalies_' + str(self.model) + str(self.df.shape) + '.txt', 'w') as file:
+    with open(f'anomalies {self.xlsx_path}/anomalies_' + str(self.model) + str(self.df.shape) + '.txt', 'w') as file:
         for indice in self.anomalies_indices:
             file.write(f"{indice}\n")
 
@@ -374,6 +380,7 @@ class printer():
   
   def load(self, path, sens_num):
     self.df = []
+    self.xlsx_path=path
     for sheet_num in range(sens_num):  # Change to range(18) when you have all
             sheet_df = pd.read_excel(path, sheet_name=sheet_num)
 
@@ -394,7 +401,7 @@ class printer():
       plt.xlabel('Time')
       plt.ylabel('Interactance')
       plt.legend()
-      plt.savefig(f'graphs/sensor_{self.df[i]["sensor"].iloc[0]}.png')
+      plt.savefig(f'graphs {self.xlsx_path}/sensor_{self.df[i]["sensor"].iloc[0]}.png')
       plt.close() 
 
 
