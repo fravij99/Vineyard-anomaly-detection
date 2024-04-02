@@ -41,6 +41,8 @@ from sklearn.linear_model import LinearRegression
 from sklearn.neighbors import LocalOutlierFactor
 import hyperopt
 from datetime import timedelta
+from matplotlib.colors import Normalize
+from matplotlib.cm import ScalarMappable
 
 
 '''In this class we have to set the local variables to assign ath every index of our notations'''
@@ -60,14 +62,18 @@ class detector():
         for sheet_num in range(sens_num):  # Change to range(18) when you have all
             sheet_df = pd.read_excel(path, sheet_name=sheet_num)
             # Dropping unnecessary columns
+            
             sheet_df = sheet_df.drop(['Unnamed: 0', 'timestamp', 'sensor', 'off_ch1', 'off_ch2', 'off_ch3', 'off_ch4'], axis=1)
             self.df.append(sheet_df)
+            
         
         self.df = np.array(self.df)
+        self.df = np.nan_to_num(self.df)
         self.df = (self.df - self.df.min()) / (self.df.max() - self.df.min())
+        print(self.df)
         self.df = self.df.transpose(1, 0, 2)
+     
 
-  
   '''Given the desired index from the main, it reshape the df into a tensor as the user wants'''
   def reshape_tensor(self, temporal_indices, spatial_indices):
     if temporal_indices[0] == 0 and temporal_indices[1] == 0:
@@ -95,7 +101,7 @@ class detector():
       try:
         if string_model == 'KMeans':
             self.str_model=string_model
-            self.model = KMeans(n_clusters=5) # 7 parameters
+            self.model = KMeans(n_clusters=3) # 7 parameters
         elif string_model == 'IsolationForest':
             self.str_model=string_model
             self.model = IsolationForest(n_estimators=100, max_samples='auto', contamination=float(0.2), random_state=42) # 8 parameters some bool
@@ -390,18 +396,21 @@ class printer():
 
   def print_all(self):
     sns.set_style('darkgrid')
+    cmap = plt.get_cmap('rainbow')
+    normalize = Normalize(vmin=0, vmax=15)
 
     for i in tqdm(range(len(self.df)), desc="Elaborazione"):
-      plt.figure(figsize=(15,10))
+        plt.figure(figsize=(15,10))
 
-      for col in self.df[i].iloc[:, 2:].columns:
-        plt.plot(self.df[i]['timestamp'], self.df[i][col], label=col)
+        for idx, col in enumerate(self.df[i].iloc[:, 2:].columns):
+            color = cmap(normalize(idx))
+            plt.plot(self.df[i]['timestamp'], self.df[i][col], label=col, color=color)
 
-      plt.title(self.df[i]['sensor'].iloc[0])
-      plt.xlabel('Time')
-      plt.ylabel('Interactance')
-      plt.legend()
-      plt.savefig(f'graphs {self.xlsx_path}/sensor_{self.df[i]["sensor"].iloc[0]}.png')
-      plt.close() 
+        plt.title(self.df[i]['sensor'].iloc[0])
+        plt.xlabel('Time')
+        plt.ylabel('Interactance')
+        plt.legend()
+        plt.savefig(f'graphs {self.xlsx_path}/sensor_{self.df[i]["sensor"].iloc[0]}.png')
+        plt.close()
 
 
