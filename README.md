@@ -22,6 +22,8 @@ Creates different statistical models such as KMeans, IsolationForest, SVM, LOF, 
 Creates deep learning models such as Conv1D, Conv2D, Conv3D, GRU1D, GRU2D, LSTM1D, and LSTM2D.
 * `fit_deep_model()`
 Fits the deep learning model to the data.
+* `fit_model()`
+Fits statistical models to the data.
 * `detect_deep_anomalies_unsup()`
 Detects anomalies using unsupervised deep learning models.
 Plots the anomaly rate trend and identifies the threshold.
