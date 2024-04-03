@@ -1,6 +1,8 @@
-<img align="right" src="https://github.com/fravij99/Vineyard-anomaly-detection/blob/master/photos/igrape.png"  width="300">
+
 
 <h1 align="center"> iGrape anomaly detection </h1> <br>
+
+<img align="right" src="https://github.com/fravij99/Vineyard-anomaly-detection/blob/master/photos/igrape.png"  width="300">
 Hey there! 
 
 This is my master thesis repository. 
