@@ -6,13 +6,13 @@ path="2022_LOU_AZE_field_maturation_final_matrix.xlsx"
 path2='2021_All raw data_No_background.xlsx'
 
 possible_shapes2=[
-([63, 0], [16*11*4, 0, 0]), 
-([63*11, 0], [16*4, 0, 0]),	
-([63*11*4, 0], [16, 0, 0]),	
-([63*11*16, 0], [4, 0, 0]),	
-([16*4, 0], [63*11, 0, 0]),	
-([4, 0], [63*11*16, 0, 0]),	
-([16, 0], [63*11*4, 0, 0]),	
+([63, 0], [16*11*6, 0, 0]), 
+([63*11, 0], [16*6, 0, 0]),	
+([63*11*6, 0], [16, 0, 0]),	
+([63*11*16, 0], [6, 0, 0]),	
+([16*6, 0], [63*11, 0, 0]),	
+([6, 0], [63*11*16, 0, 0]),	
+([16, 0], [63*11*6, 0, 0]),	
 ]
 
 possible_shapes=[
@@ -27,9 +27,9 @@ possible_shapes=[
 
 possible_models={'linear', 'KMeans', 'SVM', 'LOF', 'IsolationForest'}  #'linear', 'KMeans', 'SVM', 'LOF', 'IsolationForest' 
 det=detectorlib.detector()
-det.load_preprocess(path, 10)
+det.load_preprocess(path2, 6)
 
 for model in possible_models:
     det.create_model(model)
     #Per la rete neurale, acnhe l'ordine in cui inserisco le dimensioni risulta essere importante
-    det.stamp_all_shape_anomalies(possible_shapes)
+    det.stamp_all_shape_anomalies(possible_shapes2)

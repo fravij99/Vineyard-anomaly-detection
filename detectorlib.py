@@ -70,7 +70,6 @@ class detector():
         self.df = np.array(self.df)
         self.df = np.nan_to_num(self.df)
         self.df = (self.df - self.df.min()) / (self.df.max() - self.df.min())
-        print(self.df)
         self.df = self.df.transpose(1, 0, 2)
      
 
