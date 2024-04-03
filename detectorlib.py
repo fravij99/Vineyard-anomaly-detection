@@ -1,18 +1,9 @@
-import requests
 import pandas as pd
-import imageio
 from tensorflow.keras.regularizers import l2
-import moviepy.editor as mp
-from pathlib import Path
-import os
-import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from datetime import datetime
-import base64
-import requests
-from requests.auth import HTTPBasicAuth
 import tensorflow as tf
 from tensorflow.keras import layers, models
 from sklearn.model_selection import train_test_split
@@ -29,9 +20,6 @@ from sklearn.ensemble import IsolationForest
 from sklearn.svm import OneClassSVM
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
-from statsmodels.tsa.arima.model import ARIMA
-from statsmodels.tsa.statespace.varmax import VARMAX
-from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
 import plot_keras_history
 from sklearn.neighbors import KNeighborsClassifier as knn
 import keras
