@@ -2,103 +2,53 @@
 Hey there! 
 
 This is my master thesis repository. 
-This library provides tools for anomaly detection in multi-dimensional datasets came form iGrape projects. It includes methods for data preprocessing, model creation, and anomaly detection using various algorithms.
+This library provides tools for anomaly detection in multi-dimensional datasets came from iGrape projects. It includes methods for data preprocessing, model creation, and anomaly detection using various algorithms.
 
 ## Usage
-### Loading and Preprocessing Data
+Anomaly Detection Library
+This Python library offers a range of functionalities for anomaly detection in time-series data, particularly tailored for sensor data analysis. It provides tools to preprocess, reshape, and apply various statistical and deep learning models for anomaly detection.
 
-```
-det = detector()
-det.load_preprocess('path_to_file.xlsx', sens_num)
-
-```
-`load_preprocess(path, sens_num)`: Reads data from an Excel file and preprocesses it. 
-
-`sens_num` specifies the number of sheets to load.
-
-### Reshaping Data
-```
-det.reshape_tensor(temporal_indices, spatial_indices)
-```
-
-`reshape_tensor(temporal_indices, spatial_indices)`: Reshapes the data tensor based on temporal and spatial indices.
-### Creating Models
-
-```
-det.create_model(string_model)
-det.create_deep_model(string_model)
-create_model(string_model): Creates models for anomaly detection.
-```
-
-`create_deep_model(string_model)`: Creates deep learning models for anomaly detection.
-
-Supported `string_model options`:
-
-* 'KMeans'
-* 'IsolationForest'
-* 'SVM'
-* 'LOF'
-* 'conv1d'
-* 'conv2d'
-* 'conv3d'
-* 'GRU1D'
-* 'GRU2D'
-* 'LSTM1D'
-* 'LSTM2D'
+### detector Class
+* `tuple_prod(tupla)`
+Computes the product of a tuple of numbers.
+* `load_preprocess(path, sens_num)`
+Reads data from an Excel file and preprocesses it for anomaly detection.
+Appends the sheets to the third index of the tensor: (temporal samples, features, sensors).
+* `reshape_tensor(temporal_indices, spatial_indices)`
+Reshapes the tensor according to the desired indices.
+* `create_model(string_model)`
+Creates different statistical models such as KMeans, IsolationForest, SVM, LOF, and Linear Regression.
+* `create_deep_model(string_model)`
+Creates deep learning models such as Conv1D, Conv2D, Conv3D, GRU1D, GRU2D, LSTM1D, and LSTM2D.
+* `fit_deep_model()`
+Fits the deep learning model to the data.
+* `detect_deep_anomalies_unsup()`
+Detects anomalies using unsupervised deep learning models.
+Plots the anomaly rate trend and identifies the threshold.
+* `anomalies_sup()`
+Detects anomalies using supervised models such as SVM, KMeans, LOF, Isolation Forest, and Linear Regression.
+* `save_anomaly_indices()`
+Saves the indices of detected anomalies to a text file.
+* `stamp_all_shape_anomalies(possible_shapes)`
+Reshapes data for all possible shapes and detects anomalies.
+* `hyperopt_statistical_models(params)`
+Hyperparameter optimization for statistical models (not implemented).
 
 
-### Fitting Models
-
-```
-det.fit_model()
-det.fit_deep_model()
-det.fit_ridge()
-```
-
-`fit_model()`: Fits the selected statistical model to the data.
-
-`fit_deep_model()`: Fits deep learning models to the data.
-
-`fit_linear()`: Fits a Linear Regressor model to the data.
+### sheet Class
+* `load_timestamps(path, sens_num)`
+Loads timestamps from an Excel file.
+* `get_date(timestamp)`
+Converts timestamps to date format.
+* `find_discontinuity(*args)`
+Finds discontinuities in arrays of timestamps.
 
 
-### Anomaly Detection
-
-```
-det.detect_deep_anomalies()
-det.KMeans_anomalies()
-det.forest_svm_anomalies()
-det.lof_anomalies()
-```
-
-`detect_deep_anomalies()`: Detects anomalies using deep learning models.
-
-`KMeans_anomalies()`: Detects anomalies using KMeans clustering.
-
-`forest_svm_anomalies()`: Detects anomalies using SVM or Isolation Forest.
-
-`lof_anomalies()`: Detects anomalies using Local Outlier Factor.
-
-## Example
-```
-from anomaly_detection import detector
-
-# Create instance of detector
-det = detector()
-
-# Load and preprocess data
-det.load_preprocess('data.xlsx', sens_num)
-
-# Reshape data tensor
-det.reshape_tensor(temporal_indices=[10, 20], spatial_indices=[5, 5, 5])
-
-# Create and fit model
-det.create_model('SVM')
-det.fit_model()
-
-# Detect anomalies
-det.forest_svm_anomalies()
-```
+### printer Class
+* `load(self, path, sens_num)`
+Loads data from an Excel file.
+* `print_all(self)`
+Generates graphs for sensor data.
 
 ## Installation
 You can clone the repository using the command:
@@ -115,9 +65,9 @@ git clone git@github.com:fravij99/Vineyard-anomaly-detection.git
 * NumPy
 * Matplotlib
 * Seaborn
-
-
-For deep learning models, you may need additional packages such as Keras.
+* Datetime
+* Hyperopt
+* Keras
 
 ## License
 This library is provided under the MIT License.
