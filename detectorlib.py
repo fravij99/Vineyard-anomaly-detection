@@ -49,7 +49,7 @@ class detector():
         self.xlsx_path=path
         for sheet_num in range(sens_num):  # Change to range(18) when you have all
             sheet_df = pd.read_excel(path, sheet_name=sheet_num)
-            # Dropping unnecessary columns
+
             
             sheet_df = sheet_df.drop(['Unnamed: 0', 'timestamp', 'sensor', 'off_ch1', 'off_ch2', 'off_ch3', 'off_ch4'], axis=1)
             self.df.append(sheet_df)
@@ -62,25 +62,33 @@ class detector():
      
 
   '''Given the desired index from the main, it reshape the df into a tensor as the user wants'''
-  def reshape_tensor(self, temporal_indices, spatial_indices):
+  def reshape_ortogonal_tensor(self, temporal_indices, spatial_indices):
     if temporal_indices[0] == 0 and temporal_indices[1] == 0:
         print('Please set at least one temporal index different from 0')
         return
-    # Verifica se almeno uno degli indici spaziali è diverso da zero
+    
     if spatial_indices[0] == 0 and spatial_indices[1] == 0 and spatial_indices[2] == 0:
         print('Please set at least one spatial index different from 0')
         return
-    # definisce nuovi inidici diversi da zero
+    
     new_temporal_indices = [x for x in temporal_indices if x != 0]
     new_spatial_indices = [x for x in spatial_indices if x != 0]
 
-    # Verifica se ci sono zeri e effettuare il reshape
+    
     if 0 not in temporal_indices and 0 not in spatial_indices:
-    # Se non ci sono zeri, esegui la reshape con tutti gli indici
+    
       self.df = self.df.reshape(temporal_indices[0], temporal_indices[1], spatial_indices[0], spatial_indices[1], spatial_indices[2])
     else:
-    # Se ci sono zeri, esegui la reshape con i nuovi indici senza gli zeri
       self.df = self.df.reshape(*new_temporal_indices, *new_spatial_indices)
+  
+
+  
+  '''You have to pass the indices without zeros'''
+  def reshape_linear_tensor(self, temporal_indices, spatial_indices):
+    self.temporal_indices = temporal_indices
+    self.spatial_indices = spatial_indices
+    self.df = np.array(self.df.reshape(self.tuple_prod(temporal_indices), self.tuple_prod(spatial_indices)))
+    
       
 
 
@@ -88,7 +96,7 @@ class detector():
       try:
         if string_model == 'KMeans':
             self.str_model=string_model
-            self.model = KMeans(n_clusters=3) # 7 parameters
+            self.model = KMeans(n_clusters=5) # 7 parameters
         elif string_model == 'IsolationForest':
             self.str_model=string_model
             self.model = IsolationForest(n_estimators=100, max_samples='auto', contamination=float(0.2), random_state=42) # 8 parameters some bool
@@ -118,7 +126,7 @@ class detector():
           Flatten(),
           Dense(64, activation='relu'),
           Dense(1, activation='sigmoid'),
-          Lambda(lambda x: x, output_shape=lambda s: s)  # Aggiungi questo layer Lambda
+          Lambda(lambda x: x, output_shape=lambda s: s) 
     ])
       elif string_model == 'conv2d':
         self.str_model=string_model
@@ -128,7 +136,7 @@ class detector():
         Flatten(),
         Dense(64, activation='relu'),
         Dense(self.df.shape[1] * self.df.shape[2], activation='sigmoid'),
-        Reshape((self.df.shape[1], self.df.shape[2]))  # Modifica qui la dimensione dell'output
+        Reshape((self.df.shape[1], self.df.shape[2])) 
     ])
       elif string_model == 'conv3d':
         self.str_model=string_model
@@ -139,8 +147,8 @@ class detector():
           Dense(64, activation='relu'),
     
           Dense(self.df.shape[1]*self.df.shape[2]*self.df.shape[3], activation='sigmoid'),
-          Reshape((self.df.shape[1], self.df.shape[2], self.df.shape[3])),# Modifica qui la dimensione dell'output
-          Lambda(lambda x: x, output_shape=lambda s: s)  # Aggiungi questo layer Lambda
+          Reshape((self.df.shape[1], self.df.shape[2], self.df.shape[3])),
+          Lambda(lambda x: x, output_shape=lambda s: s)  
     ])
         
       elif string_model == 'GRU1D':
@@ -148,7 +156,7 @@ class detector():
         self.model = keras.Sequential([
           GRU(64, input_shape=((self.df.shape[1]), 1), return_sequences=True),
           GRU(32),
-          Dense((self.df.shape[1]), activation='linear'),# Modifica qui la dimensione dell'output
+          Dense((self.df.shape[1]), activation='linear'),
           Lambda(lambda x: x, output_shape=lambda s: s)
     ])
         
@@ -157,7 +165,7 @@ class detector():
         self.model = keras.Sequential([
           GRU(64, input_shape=((self.df.shape[1:])), return_sequences=True),
           GRU(32),
-          Dense(self.tuple_prod(self.df.shape[1:]), activation='linear'),# Modifica qui la dimensione dell'output
+          Dense(self.tuple_prod(self.df.shape[1:]), activation='linear'),
           Reshape((self.df.shape[1:])),
           Lambda(lambda x: x, output_shape=lambda s: s)
     ])
@@ -167,7 +175,7 @@ class detector():
         self.model = keras.Sequential([
           LSTM(64, input_shape=((self.df.shape[1]), 1), return_sequences=True),
           LSTM(32),
-          Dense((self.df.shape[1]), activation='linear'),# Modifica qui la dimensione dell'output
+          Dense((self.df.shape[1]), activation='linear'),
           Lambda(lambda x: x, output_shape=lambda s: s)
     ])
         
@@ -176,7 +184,7 @@ class detector():
         self.model = keras.Sequential([
           LSTM(64, input_shape=((self.df.shape[1:])), return_sequences=True),
           LSTM(32),
-          Dense(self.tuple_prod(self.df.shape[1:]), activation='linear'),# Modifica qui la dimensione dell'output
+          Dense(self.tuple_prod(self.df.shape[1:]), activation='linear'),
           Reshape((self.df.shape[1:])),
           Lambda(lambda x: x, output_shape=lambda s: s)
     ])
@@ -247,7 +255,7 @@ class detector():
     anomaly_percentage = 0.05  # 5%
 
     if self.str_model == 'SVM':
-        self.fit_model()  # Training SVM model
+        self.fit_model() 
         anomaly_scores = self.model.decision_function(self.df)
         num_anomalies = int(anomaly_percentage * len(self.df))
         anomaly_indices = np.where(anomaly_scores < 0)[0]  
@@ -258,11 +266,11 @@ class detector():
         print(f"Number of anomalies: {len(self.anomalies_indices)}")
 
     elif self.str_model == 'KMeans':
-        self.fit_model()  # Training KMeans model
+        self.fit_model()  
         distances = self.model.transform(self.df)
         mean_distance = np.mean(np.min(distances, axis=1))
         std_distance = np.std(np.min(distances, axis=1))
-        threshold = mean_distance + 2 * std_distance  # Example: threshold as two std devs
+        threshold = mean_distance + 2 * std_distance  
         self.anomalies_indices = np.where(np.min(distances, axis=1) > threshold)[0]
         num_anomalies = int(anomaly_percentage * len(self.df))
         sorted_anomalies_indices = np.argsort(np.min(distances, axis=1))[::-1]
@@ -271,7 +279,7 @@ class detector():
         print(f"Number of anomalies: {len(self.anomalies_indices)}")
 
     elif self.str_model == 'LOF':
-        self.fit_model()  # Training LOF model
+        self.fit_model()  
         anomalies = self.model.fit_predict(self.df)
         self.anomalies_indices = np.where(anomalies < 0)[0]
         num_anomalies = int(anomaly_percentage * len(self.df))
@@ -280,7 +288,7 @@ class detector():
         print(f"Number of anomalies: {len(self.anomalies_indices)}")
 
     elif self.str_model == 'IsolationForest':
-        self.fit_model()  # Training Isolation Forest model
+        self.fit_model()  
         anomaly_scores = self.model.decision_function(self.df)
         num_anomalies = int(anomaly_percentage * len(self.df))
         anomaly_indices = np.where(anomaly_scores < 0)[0]  
@@ -291,10 +299,9 @@ class detector():
         print(f"Number of anomalies: {len(self.anomalies_indices)}")
 
     elif self.str_model == 'linear':
-        self.fit_linear_model()  # Training linear regression model
+        self.fit_linear_model()  
         mse = np.mean(np.power(self.df - self.model.predict(self.df), 2), axis=1)
         percentile = np.percentile(np.abs(mse), (100*(1 - anomaly_percentage)))
-        # Trova gli indici delle righe con residui che superano il 95% percentile
         self.anomalies_indices = np.where(np.abs(mse) > percentile)[0]
         print(f"Anomalies indices for {self.model} {self.df.shape}:", self.anomalies_indices)
         print(f"Number of anomalies: {len(self.anomalies_indices)}")
@@ -304,8 +311,9 @@ class detector():
         print("Unknown model")
 
 
-
-  def save_anomaly_indices(self):
+  def save_linear_anomaly_indices(self):
+    self.anomalies_indices=self.anomalies_indices.reshape(self.temporal_indices)
+    print(self.anomalies_indices.shape)
     with open(f'anomalies {self.xlsx_path}/anomalies_' + str(self.model) + str(self.df.shape) + '.txt', 'w') as file:
         for indice in self.anomalies_indices:
             file.write(f"{indice}\n")
@@ -314,9 +322,9 @@ class detector():
 
   def stamp_all_shape_anomalies(self, possible_shapes):
     for temporal_indices, spatial_indices in possible_shapes:
-      self.reshape_tensor(temporal_indices, spatial_indices)
+      self.reshape_linear_tensor(temporal_indices, spatial_indices)
       self.anomalies_sup()
-      self.save_anomaly_indices()
+      self.save_linear_anomaly_indices()
 
 
   def hyperopt_statistical_models(self, params):
@@ -332,7 +340,6 @@ class sheet:
         self.df = []
         for sheet_num in range(sens_num):  # Change to range(18) when you have all
             sheet_df = pd.read_excel(path, sheet_name=sheet_num)
-            # Dropping unnecessary columns
             sheet_df = sheet_df['timestamp']
             self.df.append(sheet_df)
         return self.df
@@ -353,8 +360,7 @@ class sheet:
                 if prev_date is None:
                     prev_date = curr_date
                     continue
-
-                # Controlla se la data corrente è esattamente il giorno successivo alla data precedente
+                
                 if curr_date != prev_date + timedelta(days=1) and curr_date != prev_date + timedelta(days=0):
                     print(f"Discontinuity found on array {idx} on date : {prev_date}")
                     print(f"Delta days: {abs(curr_date - prev_date).days}")
@@ -362,7 +368,7 @@ class sheet:
                     dates.append(prev_date)
                 prev_date = curr_date
 
-            # Resetta prev_date alla fine di ogni array per confrontare solo le date tra gli array
+            
             prev_date = None
         return discs, dates
 
@@ -377,7 +383,7 @@ class printer():
     for sheet_num in range(sens_num):  # Change to range(18) when you have all
             sheet_df = pd.read_excel(path, sheet_name=sheet_num)
 
-            sheet_df = sheet_df.drop(['Unnamed: 0', 'off_ch1', 'off_ch2', 'off_ch3', 'off_ch4'], axis=1)
+            sheet_df = sheet_df.drop(['ID', 'off_ch1', 'off_ch2', 'off_ch3', 'off_ch4'], axis=1)
             self.df.append(sheet_df)
 
 
