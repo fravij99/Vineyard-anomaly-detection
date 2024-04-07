@@ -3,34 +3,22 @@ from tensorflow.keras.regularizers import l2
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-from datetime import datetime
-import tensorflow as tf
-from tensorflow.keras import layers, models
-from sklearn.model_selection import train_test_split
-import numpy as np
 import matplotlib.pyplot as plt
 from plot_keras_history import plot_history
 from keras.optimizers import Adam
 import seaborn as sns
-from sklearn import preprocessing
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
-from sklearn.covariance import EllipticEnvelope
 from sklearn.ensemble import IsolationForest
 from sklearn.svm import OneClassSVM
 from sklearn.cluster import KMeans
-from sklearn.preprocessing import StandardScaler
-import plot_keras_history
-from sklearn.neighbors import KNeighborsClassifier as knn
 import keras
 from keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Lambda, Reshape, LSTM, GRU, Conv1D, Conv3D, MaxPooling1D, MaxPooling3D
-from sklearn.linear_model import Ridge
 from sklearn.linear_model import LinearRegression
 from sklearn.neighbors import LocalOutlierFactor
 import hyperopt
 from datetime import timedelta
 from matplotlib.colors import Normalize
-from matplotlib.cm import ScalarMappable
 
 
 '''In this class we have to set the local variables to assign ath every index of our notations'''
@@ -49,8 +37,6 @@ class detector():
         self.xlsx_path=path
         for sheet_num in range(sens_num):  # Change to range(18) when you have all
             sheet_df = pd.read_excel(path, sheet_name=sheet_num)
-
-            
             sheet_df = sheet_df.drop(['Unnamed: 0', 'timestamp', 'sensor', 'off_ch1', 'off_ch2', 'off_ch3', 'off_ch4'], axis=1)
             self.df.append(sheet_df)
             
@@ -59,7 +45,7 @@ class detector():
         self.df = np.nan_to_num(self.df)
         self.df = (self.df - self.df.min()) / (self.df.max() - self.df.min())
         self.df = self.df.transpose(1, 0, 2)
-     
+
 
   '''Given the desired index from the main, it reshape the df into a tensor as the user wants'''
   def reshape_ortogonal_tensor(self, temporal_indices, spatial_indices):
@@ -76,21 +62,18 @@ class detector():
 
     
     if 0 not in temporal_indices and 0 not in spatial_indices:
-    
       self.df = self.df.reshape(temporal_indices[0], temporal_indices[1], spatial_indices[0], spatial_indices[1], spatial_indices[2])
     else:
       self.df = self.df.reshape(*new_temporal_indices, *new_spatial_indices)
   
-
   
   '''You have to pass the indices without zeros'''
+  # devi cambiare tutte le volte la shape da cui parti per essere sicuro
   def reshape_linear_tensor(self, temporal_indices, spatial_indices):
     self.temporal_indices = temporal_indices
     self.spatial_indices = spatial_indices
     self.df = np.array(self.df.reshape(self.tuple_prod(temporal_indices), self.tuple_prod(spatial_indices)))
     
-      
-
 
   def create_model(self, string_model):
       try:
@@ -194,7 +177,6 @@ class detector():
     except ValueError as e:
           print(f"Error creating model: {e}")
           return None
-    
 
 
   def fit_deep_model(self):
@@ -203,8 +185,10 @@ class detector():
     plot_history(history)
     plt.show()
 
+
   def fit_model(self):
       self.model.fit(self.df)
+
 
   def fit_linear_model(self):
     self.model.fit(self.df, self.df)
@@ -231,10 +215,10 @@ class detector():
     plt.xlabel('mse threshold')
     plt.ylabel('anomaly rate ')
     plt.show()
-    # calcolo derivata
+    
     der = np.gradient(rate)
     ind_der = np.argmax(der)
-    # Plot della derivata
+    
     plt.plot(parameters, der)
     plt.xlabel('mse threshold')
     plt.ylabel('derivative')
@@ -245,14 +229,15 @@ class detector():
     anomalies_indices = np.where(mse > parameters[ind_der])
     print('Anomaly indices:', anomalies_indices)
     return(anomalies_indices)
-  
 
 
   def fit_model(self):
     self.model.fit(self.df)
 
+
   def anomalies_sup(self):
-    anomaly_percentage = 0.05  # 5%
+    anomaly_percentage = 0.1  # 10%
+
 
     if self.str_model == 'SVM':
         self.fit_model() 
@@ -262,8 +247,6 @@ class detector():
         sorted_anomaly_indices = np.argsort(anomaly_scores[anomaly_indices])
         selected_anomaly_indices = anomaly_indices[sorted_anomaly_indices[:num_anomalies]]
         self.anomalies_indices = selected_anomaly_indices
-        print(f"Anomalies indices for {self.model} {self.df.shape}:", self.anomalies_indices)
-        print(f"Number of anomalies: {len(self.anomalies_indices)}")
 
     elif self.str_model == 'KMeans':
         self.fit_model()  
@@ -275,8 +258,6 @@ class detector():
         num_anomalies = int(anomaly_percentage * len(self.df))
         sorted_anomalies_indices = np.argsort(np.min(distances, axis=1))[::-1]
         self.anomalies_indices = sorted_anomalies_indices[:num_anomalies]
-        print(f"Anomalies indices for {self.model} {self.df.shape}:", self.anomalies_indices)
-        print(f"Number of anomalies: {len(self.anomalies_indices)}")
 
     elif self.str_model == 'LOF':
         self.fit_model()  
@@ -284,8 +265,6 @@ class detector():
         self.anomalies_indices = np.where(anomalies < 0)[0]
         num_anomalies = int(anomaly_percentage * len(self.df))
         self.anomalies_indices = np.argsort(anomalies)[::-1][:num_anomalies]
-        print(f"Anomalies indices for {self.model} {self.df.shape}:", self.anomalies_indices)
-        print(f"Number of anomalies: {len(self.anomalies_indices)}")
 
     elif self.str_model == 'IsolationForest':
         self.fit_model()  
@@ -295,36 +274,37 @@ class detector():
         sorted_anomaly_indices = np.argsort(anomaly_scores[anomaly_indices])
         selected_anomaly_indices = anomaly_indices[sorted_anomaly_indices[:num_anomalies]]
         self.anomalies_indices = selected_anomaly_indices
-        print(f"Anomalies indices for {self.model} {self.df.shape}:", self.anomalies_indices)
-        print(f"Number of anomalies: {len(self.anomalies_indices)}")
 
     elif self.str_model == 'linear':
         self.fit_linear_model()  
         mse = np.mean(np.power(self.df - self.model.predict(self.df), 2), axis=1)
         percentile = np.percentile(np.abs(mse), (100*(1 - anomaly_percentage)))
         self.anomalies_indices = np.where(np.abs(mse) > percentile)[0]
-        print(f"Anomalies indices for {self.model} {self.df.shape}:", self.anomalies_indices)
-        print(f"Number of anomalies: {len(self.anomalies_indices)}")
-
 
     else:
         print("Unknown model")
 
 
   def save_linear_anomaly_indices(self):
-    self.anomalies_indices=self.anomalies_indices.reshape(self.temporal_indices)
-    print(self.anomalies_indices.shape)
-    with open(f'anomalies {self.xlsx_path}/anomalies_' + str(self.model) + str(self.df.shape) + '.txt', 'w') as file:
-        for indice in self.anomalies_indices:
-            file.write(f"{indice}\n")
+      # divido l'indice dell'anomalia per uno degli indici temporali, poi trovo l'intero piu vicino e ho fatto teoricamente
 
+    with open(f'anomalies {self.xlsx_path}/anomalies_{self.model}_{self.temporal_indices}_{self.spatial_indices}.txt', 'w') as file:
+        for indice in self.anomalies_indices:
+          
+          if len(self.temporal_indices) == 2:
+            indice=round(self.temporal_indices[1]*((indice/self.temporal_indices[1]) % 1)), int(indice/(self.temporal_indices[1])) +1
+
+          elif len(self.temporal_indices) == 3:
+            indice=round(self.temporal_indices[0]*((indice/(self.temporal_indices[0]*self.temporal_indices[1])) % 1)), int(self.temporal_indices[1]*((indice/(self.temporal_indices[1])) % 1)) +1, int(indice/(self.temporal_indices[1]*self.temporal_indices[0])) +1
+            
+          file.write(f"{indice}\n")
 
 
   def stamp_all_shape_anomalies(self, possible_shapes):
-    for temporal_indices, spatial_indices in possible_shapes:
-      self.reshape_linear_tensor(temporal_indices, spatial_indices)
-      self.anomalies_sup()
-      self.save_linear_anomaly_indices()
+    for temporal_indices, spatial_indices in tqdm(possible_shapes, desc="Stamping shape anomalies"):
+        self.reshape_linear_tensor(temporal_indices, spatial_indices)
+        self.anomalies_sup()
+        self.save_linear_anomaly_indices()
 
 
   def hyperopt_statistical_models(self, params):
@@ -343,7 +323,7 @@ class sheet:
             sheet_df = sheet_df['timestamp']
             self.df.append(sheet_df)
         return self.df
-       
+
 
     def get_date(self, timestamp):
         return pd.to_datetime(timestamp, dayfirst=True).date()
@@ -360,14 +340,13 @@ class sheet:
                 if prev_date is None:
                     prev_date = curr_date
                     continue
-                
+        
                 if curr_date != prev_date + timedelta(days=1) and curr_date != prev_date + timedelta(days=0):
                     print(f"Discontinuity found on array {idx} on date : {prev_date}")
                     print(f"Delta days: {abs(curr_date - prev_date).days}")
                     discs.append(idx)
                     dates.append(prev_date)
                 prev_date = curr_date
-
             
             prev_date = None
         return discs, dates
@@ -376,13 +355,13 @@ class sheet:
 class printer():
   def __init__(self):
         pass
-  
+
   def load(self, path, sens_num):
     self.df = []
     self.xlsx_path=path
     for sheet_num in range(sens_num):  # Change to range(18) when you have all
             sheet_df = pd.read_excel(path, sheet_name=sheet_num)
-
+            
             sheet_df = sheet_df.drop(['ID', 'off_ch1', 'off_ch2', 'off_ch3', 'off_ch4'], axis=1)
             self.df.append(sheet_df)
 
@@ -401,9 +380,7 @@ class printer():
 
         plt.title(self.df[i]['sensor'].iloc[0])
         plt.xlabel('Time')
-        plt.ylabel('Interactance')
+        plt.ylabel('Intensity')
         plt.legend()
         plt.savefig(f'graphs {self.xlsx_path}/sensor_{self.df[i]["sensor"].iloc[0]}.png')
         plt.close()
-
-
