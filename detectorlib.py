@@ -278,8 +278,15 @@ class detector():
     elif self.str_model == 'linear':
         self.fit_linear_model()  
         mse = np.mean(np.power(self.df - self.model.predict(self.df), 2), axis=1)
-        percentile = np.percentile(np.abs(mse), (100*(1 - anomaly_percentage)))
-        self.anomalies_indices = np.where(np.abs(mse) > percentile)[0]
+    
+        # Ordina il vettore mse
+        sorted_mse_indices = np.argsort(-mse)
+        sorted_mse = mse[sorted_mse_indices]
+
+        percentile = np.percentile(np.abs(sorted_mse), (100*(1 - anomaly_percentage)))
+        self.anomalies_indices = np.where(np.abs(sorted_mse) > percentile)[0]
+
+
 
     else:
         print("Unknown model")
@@ -292,7 +299,7 @@ class detector():
         for indice in self.anomalies_indices:
           
           if len(self.temporal_indices) == 2:
-            indice=round(self.temporal_indices[1]*((indice/self.temporal_indices[1]) % 1)), int(indice/(self.temporal_indices[1])) +1
+            indice= int(indice/(self.temporal_indices[1])) +1, round(self.temporal_indices[1]*((indice/self.temporal_indices[1]) % 1)) +1
 
           elif len(self.temporal_indices) == 3:
             indice=round(self.temporal_indices[0]*((indice/(self.temporal_indices[0]*self.temporal_indices[1])) % 1)), int(self.temporal_indices[1]*((indice/(self.temporal_indices[1])) % 1)) +1, int(indice/(self.temporal_indices[1]*self.temporal_indices[0])) +1
@@ -362,7 +369,7 @@ class printer():
     for sheet_num in range(sens_num):  # Change to range(18) when you have all
             sheet_df = pd.read_excel(path, sheet_name=sheet_num)
             
-            sheet_df = sheet_df.drop(['ID', 'off_ch1', 'off_ch2', 'off_ch3', 'off_ch4'], axis=1)
+            sheet_df = sheet_df.drop(['Unnamed: 0', 'off_ch1', 'off_ch2', 'off_ch3', 'off_ch4'], axis=1)
             self.df.append(sheet_df)
 
 
