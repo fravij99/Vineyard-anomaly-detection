@@ -50,9 +50,11 @@ possible_shapes=[
 
 possible_models={'PCA', 'KMeans', 'SVM', 'LOF', 'IsolationForest'}  #'linear', 'KMeans', 'SVM', 'LOF', 'IsolationForest' 
 det=detectorlib.detector()
-det.load_preprocess(path2, 6)
 
+det.load_preprocess(path, 10)
 for model in tqdm(possible_models, desc="Creating models"):
     det.create_model(model)
     # Per la rete neurale, anche l'ordine in cui inserisco le dimensioni risulta essere importante
-    det.stamp_all_shape_anomalies(possible_shapes2)
+
+    det.stamp_all_shape_anomalies(possible_shapes)
+
