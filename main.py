@@ -48,11 +48,11 @@ possible_shapes=[
 ([16], [10, 11, 41]), 	# anomalia di singolo canale per tutti i sensori
 ]
 
-possible_models={'linear', 'KMeans', 'SVM', 'LOF', 'IsolationForest'}  #'linear', 'KMeans', 'SVM', 'LOF', 'IsolationForest' 
+possible_models={'PCA', 'KMeans', 'SVM', 'LOF', 'IsolationForest'}  #'linear', 'KMeans', 'SVM', 'LOF', 'IsolationForest' 
 det=detectorlib.detector()
-det.load_preprocess(path3, 12)
+det.load_preprocess(path, 10)
 
 for model in tqdm(possible_models, desc="Creating models"):
     det.create_model(model)
     # Per la rete neurale, anche l'ordine in cui inserisco le dimensioni risulta essere importante
-    det.stamp_all_shape_anomalies(possible_shapes3)
+    det.stamp_all_shape_anomalies(possible_shapes)

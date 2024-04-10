@@ -89,9 +89,9 @@ class detector():
         elif string_model == 'LOF':
             self.str_model=string_model
             self.model = LocalOutlierFactor() # 8 parameters some useless
-        elif string_model == 'linear':
+        elif string_model == 'PCA':
             self.str_model=string_model
-            self.model = LinearRegression() # 3 parameters only bool
+            self.model = PCA(n_components=4) # 3 parameters only bool
         else:
             raise ValueError('Model name not recognized')
       except ValueError as e:
@@ -231,10 +231,6 @@ class detector():
     return(anomalies_indices)
 
 
-  def fit_model(self):
-    self.model.fit(self.df)
-
-
   def anomalies_sup(self):
     anomaly_percentage = 0.1  # 10%
 
@@ -275,16 +271,14 @@ class detector():
         selected_anomaly_indices = anomaly_indices[sorted_anomaly_indices[:num_anomalies]]
         self.anomalies_indices = selected_anomaly_indices
 
-    elif self.str_model == 'linear':
-        self.fit_linear_model()  
-        mse = np.mean(np.power(self.df - self.model.predict(self.df), 2), axis=1)
-    
-        # Ordina il vettore mse
-        sorted_mse_indices = np.argsort(-mse)
-        sorted_mse = mse[sorted_mse_indices]
-
-        percentile = np.percentile(np.abs(sorted_mse), (100*(1 - anomaly_percentage)))
-        self.anomalies_indices = np.where(np.abs(sorted_mse) > percentile)[0]
+    elif self.str_model == 'PCA':
+        self.fit_model()
+        X_pca = self.model.transform(self.df)
+        X_reconstructed = self.model.inverse_transform(X_pca)
+        mse = np.mean(np.square(self.df - X_reconstructed), axis=1)
+        threshold = np.percentile(mse, 100 - anomaly_percentage*100)
+        anomaly_indices = np.where(mse > threshold)[0]
+        self.anomalies_indices = anomaly_indices[np.argsort(-mse[anomaly_indices])]
 
 
 
