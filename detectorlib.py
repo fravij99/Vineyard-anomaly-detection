@@ -13,13 +13,14 @@ from sklearn.ensemble import IsolationForest
 from sklearn.svm import OneClassSVM
 from sklearn.cluster import KMeans
 import keras
+import keras.layers
 from keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Lambda, Reshape, LSTM, GRU, Conv1D, Conv3D, MaxPooling1D, MaxPooling3D
 from sklearn.linear_model import LinearRegression
 from sklearn.neighbors import LocalOutlierFactor
 import hyperopt
 from datetime import timedelta
 from matplotlib.colors import Normalize
-
+from plot_keras_history import plot_history
 
 '''In this class we have to set the local variables to assign ath every index of our notations'''
 class detector():
@@ -104,13 +105,14 @@ class detector():
       if string_model == 'conv1d':
         self.str_model=string_model
         self.model = keras.Sequential([
-          Conv1D(32, (3), activation='relu', padding='same', input_shape=(int(self.df.shape[1]), 1)),
+          Conv1D(32, (3), activation='relu', padding='same', input_shape=(self.tuple_prod(self.spatial_indices), 1)),
           MaxPooling1D((2)),
           Flatten(),
           Dense(64, activation='relu'),
           Dense(1, activation='sigmoid'),
           Lambda(lambda x: x, output_shape=lambda s: s) 
     ])
+        
       elif string_model == 'conv2d':
         self.str_model=string_model
         self.model = keras.Sequential([
@@ -121,6 +123,7 @@ class detector():
         Dense(self.df.shape[1] * self.df.shape[2], activation='sigmoid'),
         Reshape((self.df.shape[1], self.df.shape[2])) 
     ])
+        
       elif string_model == 'conv3d':
         self.str_model=string_model
         self.model = keras.Sequential([
@@ -137,7 +140,7 @@ class detector():
       elif string_model == 'GRU1D':
         self.str_model=string_model
         self.model = keras.Sequential([
-          GRU(64, input_shape=((self.df.shape[1]), 1), return_sequences=True),
+          GRU(64, input_shape=(self.tuple_prod(self.spatial_indices), 1), return_sequences=True),
           GRU(32),
           Dense((self.df.shape[1]), activation='linear'),
           Lambda(lambda x: x, output_shape=lambda s: s)
@@ -156,7 +159,7 @@ class detector():
       elif string_model == 'LSTM1D':
         self.str_model=string_model
         self.model = keras.Sequential([
-          LSTM(64, input_shape=((self.df.shape[1]), 1), return_sequences=True),
+          LSTM(64, input_shape=(self.tuple_prod(self.spatial_indices), 1), return_sequences=True),
           LSTM(32),
           Dense((self.df.shape[1]), activation='linear'),
           Lambda(lambda x: x, output_shape=lambda s: s)
@@ -171,6 +174,7 @@ class detector():
           Reshape((self.df.shape[1:])),
           Lambda(lambda x: x, output_shape=lambda s: s)
     ])
+        
       else:
             raise ValueError('Model name not recognized')
       
@@ -183,52 +187,23 @@ class detector():
     self.model.compile(optimizer='adam', loss='mean_squared_error')
     history= self.model.fit(self.df, self.df, epochs=150, batch_size=32, validation_split=0.1, verbose=1)
     plot_history(history)
-    plt.show()
+    plt.savefig(f'training {self.xlsx_path}/model_{self.str_model}_{self.temporal_indices}_{self.spatial_indices}.png')
 
 
   def fit_model(self):
       self.model.fit(self.df)
 
-
   def fit_linear_model(self):
     self.model.fit(self.df, self.df)
- 
 
-  def detect_deep_anomalies_unsup(self):
+
+  def deep_anomalies(self):
+    self.fit_deep_model()
     reconstructed = self.model.predict(self.df)
     mse = np.mean(np.power(self.df - reconstructed, 2), axis=1)
-    rate=[]
-    parameters = np.linspace(mse.min(), mse.max(), 1000)
-    for i in range(len(parameters)):
-      anomal = np.where(mse > parameters[i])
-      if len(self.df.shape) == 2:
-        rate.append((len(anomal[0]))/(self.df.shape[0]))
-      elif len(self.df.shape) == 3:
-        rate.append((len(anomal[0]))/(self.df.shape[0]*self.df.shape[2]))
-      elif len(self.df.shape) == 4:
-        rate.append((len(anomal[0]))/(self.df.shape[0]*self.df.shape[3]*self.df.shape[2]))        
-
-    sns.set_style('darkgrid')
-    plt.plot(parameters, rate)
-    plt.scatter(parameters, rate)
-    plt.title('Anomaly rate trend for combination: ' + str(self.str_model) + str(self.df.shape))
-    plt.xlabel('mse threshold')
-    plt.ylabel('anomaly rate ')
-    plt.show()
-    
-    der = np.gradient(rate)
-    ind_der = np.argmax(der)
-    
-    plt.plot(parameters, der)
-    plt.xlabel('mse threshold')
-    plt.ylabel('derivative')
-    plt.show()
-    print("Index max derivative:", ind_der)
-    print("parameter in that point:", parameters[ind_der])
-    anomalies_indices=[]
-    anomalies_indices = np.where(mse > parameters[ind_der])
-    print('Anomaly indices:', anomalies_indices)
-    return(anomalies_indices)
+    threshold = np.percentile(mse, 100 - 10)
+    anomalies_idx = np.where(mse > threshold)[0]
+    self.anomalies_indices = anomalies_idx[np.argsort(mse[anomalies_idx])[::-1]]
 
 
   def anomalies_sup(self):
@@ -280,8 +255,6 @@ class detector():
         anomaly_indices = np.where(mse > threshold)[0]
         self.anomalies_indices = anomaly_indices[np.argsort(-mse[anomaly_indices])]
 
-
-
     else:
         print("Unknown model")
 
@@ -289,7 +262,7 @@ class detector():
   def save_linear_anomaly_indices(self):
       # divido l'indice dell'anomalia per uno degli indici temporali, poi trovo l'intero piu vicino e ho fatto teoricamente
 
-    with open(f'anomalies {self.xlsx_path}/anomalies_{self.model}_{self.temporal_indices}_{self.spatial_indices}.txt', 'w') as file:
+    with open(f'anomalies {self.xlsx_path}/anomalies_{self.str_model}_{self.temporal_indices}_{self.spatial_indices}.txt', 'w') as file:
         for indice in self.anomalies_indices:
           
           if len(self.temporal_indices) == 2:
@@ -307,9 +280,14 @@ class detector():
         self.anomalies_sup()
         self.save_linear_anomaly_indices()
 
+  
+  def stamp_all_shape_deep_anomalies(self, possible_shapes, model):
+    for temporal_indices, spatial_indices in tqdm(possible_shapes, desc="Stamping shape anomalies"):
+        self.reshape_linear_tensor(temporal_indices, spatial_indices)
+        self.create_deep_model(model)
+        self.deep_anomalies()
+        self.save_linear_anomaly_indices()
 
-  def hyperopt_statistical_models(self, params):
-    return
 
 
 
