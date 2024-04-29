@@ -103,7 +103,7 @@ class detector():
   def create_deep_model(self, string_model):
     try:
       if string_model == 'conv1d':
-        self.str_model=string_model
+        self.str_model=string_model + f"_32"
         self.model = keras.Sequential([
           Conv1D(32, (3), activation='relu', padding='same', input_shape=(self.tuple_prod(self.spatial_indices), 1)),
           MaxPooling1D((2)),
@@ -262,7 +262,7 @@ class detector():
   def save_linear_anomaly_indices(self):
       # divido l'indice dell'anomalia per uno degli indici temporali, poi trovo l'intero piu vicino e ho fatto teoricamente
 
-    with open(f'anomalies {self.xlsx_path}/anomalies_{self.str_model}_{self.temporal_indices}_{self.spatial_indices}.txt', 'w') as file:
+    with open(f'anomalies_PCA_95_variance {self.xlsx_path}/anomalies_{self.model}_{self.temporal_indices}_{self.spatial_indices}.txt', 'w') as file:
         for indice in self.anomalies_indices:
           
           if len(self.temporal_indices) == 2:
@@ -277,8 +277,12 @@ class detector():
   def stamp_all_shape_anomalies(self, possible_shapes):
     for temporal_indices, spatial_indices in tqdm(possible_shapes, desc="Stamping shape anomalies"):
         self.reshape_linear_tensor(temporal_indices, spatial_indices)
+        if self.str_model == 'PCA':
+          self.PCA_graph()
+          self.model=PCA(n_components=self.PCA_Ncomponents)
         self.anomalies_sup()
         self.save_linear_anomaly_indices()
+
 
   
   def stamp_all_shape_deep_anomalies(self, possible_shapes, model):
@@ -287,6 +291,29 @@ class detector():
         self.create_deep_model(model)
         self.deep_anomalies()
         self.save_linear_anomaly_indices()
+
+
+  def PCA_graph(self):
+    sns.set_style('darkgrid')
+    n_components_range = range(1, 11)  
+    explained_variances = []
+
+    for n_components in n_components_range:
+        pca = PCA(n_components=n_components)
+        pca.fit(self.df)
+        explained_variances.append(sum(pca.explained_variance_ratio_))
+
+    plt.plot(n_components_range, explained_variances, marker='o')
+    plt.xlabel('Number of Components')
+    plt.ylabel('Total Variance Explained')
+    plt.title('Total Variance Explained by Number of Components')
+    plt.axhline(y=0.95, linestyle='dashed', color='red')
+    plt.xticks(n_components_range)  
+    plt.savefig(f'graphs_variance_PCA {self.xlsx_path}/shape_{self.temporal_indices}_{self.spatial_indices}')
+    plt.close()
+
+    self.PCA_Ncomponents = next((i for i, valore in enumerate(explained_variances) if valore > 0.95), len(explained_variances) - 1)+1
+    print(self.PCA_Ncomponents, self.temporal_indices, self.spatial_indices)
 
 
 
