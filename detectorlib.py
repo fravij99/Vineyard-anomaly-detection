@@ -1,11 +1,9 @@
 import pandas as pd
-from tensorflow.keras.regularizers import l2
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 from plot_keras_history import plot_history
-from keras.optimizers import Adam
 import seaborn as sns
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
@@ -15,13 +13,11 @@ from sklearn.cluster import KMeans
 import keras
 import keras.layers
 from keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Lambda, Reshape, LSTM, GRU, Conv1D, Conv3D, MaxPooling1D, MaxPooling3D
-from sklearn.linear_model import LinearRegression
 from sklearn.neighbors import LocalOutlierFactor
-import hyperopt
 from datetime import timedelta
 from matplotlib.colors import Normalize
 from plot_keras_history import plot_history
-
+from scipy.stats import chi2
 '''In this class we have to set the local variables to assign ath every index of our notations'''
 class detector():
 
@@ -292,10 +288,18 @@ class detector():
         self.deep_anomalies()
         self.save_linear_anomaly_indices()
 
+    plt.savefig(f'graphs_variance_PCA {self.xlsx_path}/shape_{self.temporal_indices}_{self.spatial_indices}')
+    plt.close()
+
 
   def PCA_graph(self):
     sns.set_style('darkgrid')
-    n_components_range = range(1, 11)  
+
+    if self.temporal_indices == [16, 10]:
+        n_components_range = range(1, 51)
+    else:
+        n_components_range = range(1, 11)
+
     explained_variances = []
 
     for n_components in n_components_range:
@@ -303,19 +307,57 @@ class detector():
         pca.fit(self.df)
         explained_variances.append(sum(pca.explained_variance_ratio_))
 
+    plt.figure(figsize=(12, 6))
+    plt.subplot(1, 2, 1)
     plt.plot(n_components_range, explained_variances, marker='o')
     plt.xlabel('Number of Components')
     plt.ylabel('Total Variance Explained')
     plt.title('Total Variance Explained by Number of Components')
     plt.axhline(y=0.95, linestyle='dashed', color='red')
-    plt.xticks(n_components_range)  
+    plt.xticks(n_components_range)
     plt.savefig(f'graphs_variance_PCA {self.xlsx_path}/shape_{self.temporal_indices}_{self.spatial_indices}')
     plt.close()
 
     self.PCA_Ncomponents = next((i for i, valore in enumerate(explained_variances) if valore > 0.95), len(explained_variances) - 1)+1
     print(self.PCA_Ncomponents, self.temporal_indices, self.spatial_indices)
 
+    pca = PCA(n_components=self.PCA_Ncomponents)
+    pca.fit(self.df)
+    scores = pca.transform(self.df)
+    # devo calcolare i loadings
+    loadings = pca.components_.T * np.sqrt(pca.explained_variance_)
+    t_squared = np.sum((scores[:, :self.PCA_Ncomponents] / np.sqrt(pca.explained_variance_))**2, axis=1)
+    q_residuals = np.sum(self.df**2 - np.dot(scores, loadings.T)**2, axis=1)
 
+    fig, axs = plt.subplots(1, 3, figsize=(18, 6))
+    # Grafico dei punteggi
+    axs[0].scatter(scores[:, 0], scores[:, 1], color='lightblue', edgecolors='black')
+    axs[0].set_xlabel('PC1')
+    axs[0].set_ylabel('PC2')
+    axs[0].set_title('Scores Plot')
+
+
+    # Grafico dei pesi
+    axs[1].plot(range(self.tuple_prod(self.spatial_indices)), loadings[:, 0], label='PC1')
+    axs[1].plot(range(self.tuple_prod(self.spatial_indices)), loadings[:, 1], label='PC2')
+    axs[1].set_xlabel('Loadings')
+    axs[1].set_ylabel('Variables')
+    axs[1].set_title('Loadings Plot')
+    axs[1].legend()
+
+    # Grafico di t^2 vs residui Q
+    axs[2].scatter(t_squared, q_residuals, color='lightblue', edgecolors='black')
+    axs[2].axhline(y=np.max(q_residuals)*0.95, color='red', linestyle='--', label='Q Residuals 95% Threshold')
+    axs[2].axvline(x=np.max(t_squared)*0.95, color='red', linestyle='--', label='T-squared 95% Threshold')
+    axs[2].set_xlabel('T-squared (t^2)')
+    axs[2].set_ylabel('Q Residuals')
+    axs[2].set_title('T-squared vs Q Residuals')
+    axs[2].legend()
+
+    plt.savefig(f'graphs_variance_PCA {self.xlsx_path}/scores_vs_loadings_shape_{self.temporal_indices}_{self.spatial_indices}')
+    plt.tight_layout()
+    plt.close()
+    
 
 
 class sheet:
