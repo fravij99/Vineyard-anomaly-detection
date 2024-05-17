@@ -9,7 +9,7 @@ This is my master thesis repository.
 This library provides tools for anomaly detection in multi-dimensional datasets came from iGrape projects. It includes methods for data preprocessing, model creation, and anomaly detection using various algorithms.
 
 ## Usage
-Anomaly Detection Library
+### Anomaly Detection Library
 This Python library offers a range of functionalities for anomaly detection in time-series data, particularly tailored for sensor data analysis. It provides tools to preprocess, reshape, and apply various statistical and deep learning models for anomaly detection.
 
 ### detector Class
