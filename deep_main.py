@@ -47,13 +47,25 @@ possible_shapes=[
 ([16], [10, 11, 41]), 	# anomalia di singolo canale per tutti i sensori
 ]
 
-possible_models1D={'LSTM1D', 'GRU1D', 'conv1d'} 
+hyperparameters={
+    'ker_strd':[4, 5, 6],
+    'layers':[1, 2]
+}
+combinations = []
+for filters in hyperparameters['ker_strd']:
+    for layers in hyperparameters['layers']:
+        if isinstance(filters, int):
+            filters = [filters] * layers
+        combinations.append((filters, layers))
+
+possible_models1D={'conv1d'} 
 possible_models2D={'LSTM2D', 'GRU2D', 'CONV2D'} 
 possible_models3D={'CONV3D'} 
 det=detectorlib.detector()
 
 det.load_preprocess(path, 10)
+
 for model in tqdm(possible_models1D, desc="Creating models"):
     # Per la rete neurale, anche l'ordine in cui inserisco le dimensioni risulta essere importante
 
-    det.stamp_all_shape_deep_anomalies(possible_shapes, model)
+    det.hyperopt_anomalies(possible_shapes, model, combinations)

@@ -1,0 +1,7 @@
+Explained variance for shape [41]_[16, 11, 10]: 0.8681266505022884
+Explained variance for shape [41, 11]_[16, 10]: 0.8632755943305828
+Explained variance for shape [41, 11, 10]_[16]: 0.9531381520347932
+Explained variance for shape [41, 11, 16]_[10]: 1.0
+Explained variance for shape [16, 10]_[41, 11]: 0.3582718491728941
+Explained variance for shape [10]_[41, 11, 16]: 0.8149863586217296
+Explained variance for shape [16]_[10, 11, 41]: 0.6690677713468111

@@ -17,10 +17,20 @@ from sklearn.neighbors import LocalOutlierFactor
 from datetime import timedelta
 from matplotlib.colors import Normalize
 from plot_keras_history import plot_history
-from scipy.stats import chi2
+
 '''In this class we have to set the local variables to assign ath every index of our notations'''
 class detector():
 
+  '''                                                                                        
+Explained variance for shape [41]_[11, 16, 10]: 0.8681266505022884
+Explained variance for shape [41, 11]_[16, 10]: 0.8632755943305828
+Explained variance for shape [41, 11, 10]_[16]: 0.9531381520347932
+Explained variance for shape [41, 11, 16]_[10]: 0.9067262065543965
+Explained variance for shape [16, 10]_[41, 11]: 0.3582718491728941
+Explained variance for shape [10]_[41, 11, 16]: 0.8149863586217296
+Explained variance for shape [16]_[10, 11, 41]: 0.6690677713468111
+'''
+  
   def tuple_prod(self, tupla):
     prodotto = 1
     for dim in tupla:
@@ -66,11 +76,18 @@ class detector():
   
   '''You have to pass the indices without zeros'''
   # devi cambiare tutte le volte la shape da cui parti per essere sicuro
-  def reshape_linear_tensor(self, temporal_indices, spatial_indices):
+  def reshape_linear_tensor(self, temporal_indices, spatial_indices, standardize=False):
+
     self.temporal_indices = temporal_indices
     self.spatial_indices = spatial_indices
     self.df = np.array(self.df.reshape(self.tuple_prod(temporal_indices), self.tuple_prod(spatial_indices)))
-    
+    if standardize == True:
+
+      mean = np.mean(self.df, axis=0)
+      std_dev = np.std(self.df, axis=0)
+      self.df = (self.df - mean)/(std_dev)
+      self.df = (self.df - self.df.min()) / (self.df.max() - self.df.min())
+          
 
   def create_model(self, string_model):
       try:
@@ -95,17 +112,40 @@ class detector():
         print(f"Error creating model: {e}")
         return None
 
+  def create_PCA(self):
+    explained_variances=[]
+
+    for i in range(10):
+      pca = PCA(n_components=i+1)
+      pca.fit(self.df)
+      explained_variances.append(sum(pca.explained_variance_ratio_))
+    self.PCA_Ncomponents = next((i for i, valore in enumerate(explained_variances) if valore > self.variance_components), len(explained_variances) - 1)+1
+    self.model=PCA(n_components=self.PCA_Ncomponents)
+    return
+
+
+  def hyperopt_deep_model(self, string_model):
+      
+    self.str_model = string_model + f"_layers{self.layers}_KerStrd_{self.ker_strd}_nodes_64"
+    self.model = keras.Sequential()
+    for i in range(self.layers):
+        self.model.add(Conv1D(filters=4, kernel_size=self.ker_strd, strides=self.ker_strd, activation='relu', padding='same', input_shape=(self.tuple_prod(self.spatial_indices), 1)))
+    self.model.add(Flatten())
+    self.model.add(Dense(64, activation='relu'))
+    self.model.add(Dense((self.df.shape[1]), activation='linear'))
+    self.model.add(Lambda(lambda x: x, output_shape=lambda s: s))
+     
 
   def create_deep_model(self, string_model):
     try:
       if string_model == 'conv1d':
-        self.str_model=string_model + f"_32_nodes_1_layer"
+        self.str_model=string_model + f"_32_filters_2_layer"
         self.model = keras.Sequential([
-          Conv1D(16, (3), activation='relu', padding='same', input_shape=(self.tuple_prod(self.spatial_indices), 1)),
-          Conv1D(16, (3), activation='relu', padding='same'),
+          Conv1D(filters=64, kernel_size=(4), strides=4, activation='relu', padding='same', input_shape=(self.tuple_prod(self.spatial_indices), 1)),
+          Conv1D(filters=32, kernel_size=(6), strides=6, activation='relu', padding='same'),
+          Conv1D(filters=16, kernel_size=(8), strides=8, activation='relu', padding='same'),
           Flatten(),
-          Dense(64, activation='relu'),
-          Dense(1, activation='sigmoid'),
+          Dense((self.df.shape[1]), activation='linear'),
           Lambda(lambda x: x, output_shape=lambda s: s) 
     ])
         
@@ -134,9 +174,9 @@ class detector():
     ])
         
       elif string_model == 'GRU1D':
-        self.str_model=string_model
+        self.str_model=string_model+f"_16_32"
         self.model = keras.Sequential([
-          GRU(64, input_shape=(self.tuple_prod(self.spatial_indices), 1), return_sequences=True),
+          GRU(16, input_shape=(self.tuple_prod(self.spatial_indices), 1), return_sequences=True),
           GRU(32),
           Dense((self.df.shape[1]), activation='linear'),
           Lambda(lambda x: x, output_shape=lambda s: s)
@@ -181,9 +221,10 @@ class detector():
 
   def fit_deep_model(self):
     self.model.compile(optimizer='adam', loss='mean_squared_error')
-    history= self.model.fit(self.df, self.df, epochs=150, batch_size=32, validation_split=0.1, verbose=1)
+    history= self.model.fit(self.df, self.df, epochs=self.tuple_prod(self.spatial_indices), batch_size=32, validation_split=0.1, verbose=1)
     plot_history(history)
-    plt.savefig(f'hyperopt_conv1d {self.xlsx_path}/training_model_{self.str_model}_{self.temporal_indices}_{self.spatial_indices}.png')
+    plt.savefig(f'hyperopt_conv1d_{self.xlsx_path}/training_model_{self.str_model}_{self.temporal_indices}_{self.spatial_indices}.png')
+    plt.close()
 
 
   def fit_model(self):
@@ -258,7 +299,7 @@ class detector():
   def save_linear_anomaly_indices(self):
       # divido l'indice dell'anomalia per uno degli indici temporali, poi trovo l'intero piu vicino e ho fatto teoricamente
 
-    with open(f'hyperopt_conv1d {self.xlsx_path}/anomalies_{self.str_model}_{self.temporal_indices}_{self.spatial_indices}.txt', 'w') as file:
+    with open(f'hyperopt_conv1d_{self.xlsx_path}/anomalies_{self.str_model}_{self.temporal_indices}_{self.spatial_indices}.txt', 'w') as file:
         for indice in self.anomalies_indices:
           
           if len(self.temporal_indices) == 2:
@@ -271,18 +312,63 @@ class detector():
 
 
   def stamp_all_shape_anomalies(self, possible_shapes):
+    variance_txt=[0.8681266505022884, 
+                            0.8632755943305828, 
+                            0.9531381520347932, 
+                            0.9067262065543965, 
+                            0.3582718491728941, 
+                            0.8149863586217296, 
+                            0.6690677713468111]
+    colors = plt.get_cmap('tab10').colors
+    
+    i=0
+    explained_graph_variances=[]
+    plt.figure(figsize=(9,6))
+    plt.rcParams.update({'font.size': 12})
+    #with open('final_variances_std_pca_2022.txt', 'a') as variances:
     for temporal_indices, spatial_indices in tqdm(possible_shapes, desc="Stamping shape anomalies"):
-        self.reshape_linear_tensor(temporal_indices, spatial_indices)
-        if self.str_model == 'PCA':
-          self.PCA_graph()
-          self.model=PCA(n_components=self.PCA_Ncomponents)
-        self.anomalies_sup()
-        self.save_linear_anomaly_indices()
+            self.reshape_linear_tensor(temporal_indices, spatial_indices, standardize=True)
+            explained_graph_variances.append(self.PCA_graph())
+            if self.str_model == 'PCA':
+                if temporal_indices == [42]:
+                    self.variance_components= variance_txt[0]
+                elif temporal_indices == [42, 11]:
+                    self.variance_components = variance_txt[1]
+                elif temporal_indices == [42, 11, 12]:
+                    self.variance_components = variance_txt[2]
+                elif temporal_indices == [42, 11, 16]:
+                    self.variance_component = variance_txt[3]
+                elif temporal_indices == [16, 12]:
+                    self.variance_components = variance_txt[4]
+                elif temporal_indices == [12]:
+                    self.variance_components = variance_txt[5]
+                elif temporal_indices == [16]:
+                    self.variance_components = variance_txt[6]
+                self.create_PCA()
+                self.fit_model()
+                variances.write(f"Explained variance for shape {temporal_indices}_{spatial_indices}: {np.sum(self.model.explained_variance_ratio_)}\n")
+            self.anomalies_sup()
+            self.save_linear_anomaly_indices()
+
+            
+            plt.plot(np.arange(1, 11, 1), explained_graph_variances[i], label=f'{self.temporal_indices}_{self.spatial_indices}', color=colors[i])
+            plt.scatter(np.arange(1, 11, 1), explained_graph_variances[i], edgecolors='black', color=colors[i])
+            plt.axhline(y=variance_txt[i], linestyle='dashed', color=colors[i])
+            plt.xlabel('components', fontsize=15)
+            plt.ylabel('variance explained', fontsize=15)
+            plt.legend()
+
+
+            i=i+1
+    plt.savefig(f'All_variances_in_a_graph')
+    plt.close()
+    self.PCA_graph()
 
 
   
   def stamp_all_shape_deep_anomalies(self, possible_shapes, model):
-    for temporal_indices, spatial_indices in tqdm(possible_shapes, desc="Stamping shape anomalies"):
+
+      for temporal_indices, spatial_indices in tqdm(possible_shapes, desc="Stamping shape anomalies"):
         self.reshape_linear_tensor(temporal_indices, spatial_indices)
         self.create_deep_model(model)
         self.deep_anomalies()
@@ -290,15 +376,28 @@ class detector():
 
 
 
+  def hyperopt_anomalies(self, possible_shapes, model, possible_combinations):
+    for combinations in tqdm(possible_combinations, desc="Stamping hyperpatameters"):
+      ker_strd, layers = combinations
+      self.ker_strd = ker_strd
+      self.layers = layers
+      for temporal_indices, spatial_indices in tqdm(possible_shapes, desc="Stamping shape anomalies"):
+        self.reshape_linear_tensor(temporal_indices, spatial_indices)
+        self.hyperopt_deep_model(model)
+        self.deep_anomalies()
+        self.save_linear_anomaly_indices()
+
+     
+
   def PCA_graph(self):
     sns.set_style('darkgrid')
 
-    if self.temporal_indices == [16, 10]:
+    if self.temporal_indices == [16, 20]:
         n_components_range = range(1, 51)
     else:
         n_components_range = range(1, 11)
 
-
+    
     explained_variances = []
 
     for n_components in n_components_range:
@@ -328,22 +427,24 @@ class detector():
     q_residuals = np.sum(self.df**2 - np.dot(scores, loadings.T)**2, axis=1)
 
     fig, axs = plt.subplots(1, 3, figsize=(18, 6))
-    # Grafico dei punteggi
+    plt.rcParams.update({'font.size': 15})
     axs[0].scatter(scores[:, 0], scores[:, 1], color='lightblue', edgecolors='black')
     axs[0].set_xlabel('PC1')
     axs[0].set_ylabel('PC2')
+    axs[0].axhline(y=0, linestyle='dashed', color='red')
+    axs[0].axvline(x=0, linestyle='dashed', color='red')
     axs[0].set_title('Scores Plot')
 
 
-    # Grafico dei pesi
     axs[1].plot(range(self.tuple_prod(self.spatial_indices)), loadings[:, 0], label='PC1')
     axs[1].plot(range(self.tuple_prod(self.spatial_indices)), loadings[:, 1], label='PC2')
     axs[1].set_xlabel('Loadings')
     axs[1].set_ylabel('Variables')
+    axs[1].axhline(y=0, linestyle='dashed', color='red')
+    axs[1].axvline(x=0, linestyle='dashed', color='red')
     axs[1].set_title('Loadings Plot')
     axs[1].legend()
 
-    # Grafico di t^2 vs residui Q
     axs[2].scatter(t_squared, q_residuals, color='lightblue', edgecolors='black')
     axs[2].axhline(y=np.max(q_residuals)*0.95, color='red', linestyle='--', label='Q Residuals 95% Threshold')
     axs[2].axvline(x=np.max(t_squared)*0.95, color='red', linestyle='--', label='T-squared 95% Threshold')
@@ -355,6 +456,7 @@ class detector():
     plt.savefig(f'graphs_variance_PCA {self.xlsx_path}/scores_vs_loadings_shape_{self.temporal_indices}_{self.spatial_indices}')
     plt.tight_layout()
     plt.close()
+    return explained_variances
     
 
 
@@ -366,7 +468,7 @@ class sheet:
         self.df = []
         for sheet_num in range(sens_num):  # Change to range(18) when you have all
             sheet_df = pd.read_excel(path, sheet_name=sheet_num)
-            sheet_df = sheet_df['timestamp']
+            sheet_df = sheet_df['Date Acquisition']
             self.df.append(sheet_df)
         return self.df
 
@@ -412,6 +514,7 @@ class printer():
             self.df.append(sheet_df)
 
 
+
   def print_all(self):
     sns.set_style('darkgrid')
     cmap = plt.get_cmap('rainbow')
@@ -419,14 +522,15 @@ class printer():
 
     for i in tqdm(range(len(self.df)), desc="Elaborazione"):
         plt.figure(figsize=(15,10))
+        plt.rcParams.update({'font.size': 15})
 
         for idx, col in enumerate(self.df[i].iloc[:, 2:].columns):
             color = cmap(normalize(idx))
             plt.plot(self.df[i]['timestamp'], self.df[i][col], label=col, color=color)
 
         plt.title(self.df[i]['sensor'].iloc[0])
-        plt.xlabel('Time')
-        plt.ylabel('Intensity')
+        plt.xlabel('Time', fontsize=20)
+        plt.ylabel('Intensity', fontsize=20)
         plt.legend()
         plt.savefig(f'graphs {self.xlsx_path}/sensor_{self.df[i]["sensor"].iloc[0]}.png')
         plt.close()
