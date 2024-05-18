@@ -33,12 +33,24 @@ Detects anomalies using unsupervised deep learning models.
 Plots the anomaly rate trend and identifies the threshold.
 * `anomalies_sup()`
 Detects anomalies using supervised models such as SVM, KMeans, LOF, Isolation Forest, and Linear Regression.
-* `save_anomaly_indices()`
+* `save_linear_anomaly_indices()`
 Saves the indices of detected anomalies to a text file.
 * `stamp_all_shape_anomalies(possible_shapes)`
 Reshapes data for all possible shapes and detects anomalies.
 * `hyperopt_statistical_models(params)`
-Hyperparameter optimization for statistical models (not implemented).
+Performs hyperparameter optimization for statistical models and saves anomaly detection results.
+* `hyperopt_anomalies()`
+Performs hyperparameter optimization for deep learning models and saves anomaly detection results.
+* `create_PCA()`
+Performs PCA analysis to determine the number of components needed to explain a desired amount of variance.
+* `hyperopt_deep_model and create_deep_model`
+Define and create various deep learning models (Conv1D, Conv2D, Conv3D, GRU1D, GRU2D, LSTM1D, LSTM2D) for anomaly detection.
+* `deep_anomalies()` and `anomalies_sup()`
+Detect anomalies using deep learning and other machine learning models, respectively.
+* `stamp_all_shape_deep_anomalies(possible_shapes)`
+Reshapes data for all possible shapes and detects anomalies for deep models.
+* `PCA_graph()`
+Generates and saves plots showing PCA results, including variance explained by different numbers of components.
 
 
 ### sheet Class
@@ -75,8 +87,8 @@ git clone git@github.com:fravij99/Vineyard-anomaly-detection.git
 * Matplotlib
 * Seaborn
 * Datetime
-* Hyperopt
 * Keras
+* Tqdm
 
 ## License
 This library is provided under the MIT License.
