@@ -325,8 +325,8 @@ Explained variance for shape [16]_[10, 11, 41]: 0.6690677713468111
     explained_graph_variances=[]
     plt.figure(figsize=(9,6))
     plt.rcParams.update({'font.size': 12})
-    #with open('final_variances_std_pca_2022.txt', 'a') as variances:
-    for temporal_indices, spatial_indices in tqdm(possible_shapes, desc="Stamping shape anomalies"):
+    with open('final_variances_std_pca_2022.txt', 'a') as variances:
+      for temporal_indices, spatial_indices in tqdm(possible_shapes, desc="Stamping shape anomalies"):
             self.reshape_linear_tensor(temporal_indices, spatial_indices, standardize=True)
             explained_graph_variances.append(self.PCA_graph())
             if self.str_model == 'PCA':
