@@ -12,12 +12,12 @@ from sklearn.svm import OneClassSVM
 from sklearn.cluster import KMeans
 import keras
 import keras.layers
-from keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Lambda, Reshape, LSTM, GRU, Conv1D, Conv3D, MaxPooling1D, MaxPooling3D
+from keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Lambda, Reshape, LSTM, GRU, Conv1D, Conv3D, MaxPooling1D, MaxPooling3D, Conv1DTranspose
 from sklearn.neighbors import LocalOutlierFactor
 from datetime import timedelta
 from matplotlib.colors import Normalize
 from plot_keras_history import plot_history
-
+import tensorflow as tf
 '''In this class we have to set the local variables to assign ath every index of our notations'''
 class detector():
 
@@ -31,19 +31,20 @@ Explained variance for shape [10]_[41, 11, 16]: 0.8149863586217296
 Explained variance for shape [16]_[10, 11, 41]: 0.6690677713468111
 '''
   
-  def tuple_prod(self, tupla):
-    prodotto = 1
-    for dim in tupla:
-        prodotto *= dim
-    return prodotto
+  def tuple_prod(self, tuple):
+    prod = 1
+    for dim in tuple:
+        prod *= dim
+    return prod
   
 
   '''Reads from excel file the data and append the sheets to the third index of the tensor: (temporal samples, features, sensors)'''
   def load_preprocess(self, path, sens_num):
         self.df = []
         self.xlsx_path=path
-        for sheet_num in range(sens_num):  # Change to range(18) when you have all
+        for sheet_num in range(sens_num): 
             sheet_df = pd.read_excel(path, sheet_name=sheet_num)
+            self.timestamp = sheet_df['timestamp'].dt.date
             sheet_df = sheet_df.drop(['Unnamed: 0', 'timestamp', 'sensor', 'off_ch1', 'off_ch2', 'off_ch3', 'off_ch4'], axis=1)
             self.df.append(sheet_df)
             
@@ -89,23 +90,23 @@ Explained variance for shape [16]_[10, 11, 41]: 0.6690677713468111
       self.df = (self.df - self.df.min()) / (self.df.max() - self.df.min())
           
 
-  def create_model(self, string_model):
+  def create_statistical_model(self, string_model):
       try:
         if string_model == 'KMeans':
             self.str_model=string_model
-            self.model = KMeans(n_clusters=5) # 7 parameters
+            self.model = KMeans(n_clusters=5) 
         elif string_model == 'IsolationForest':
             self.str_model=string_model
-            self.model = IsolationForest(n_estimators=100, max_samples='auto', contamination=float(0.2), random_state=42) # 8 parameters some bool
+            self.model = IsolationForest(n_estimators=100, max_samples='auto', contamination=float(0.2), random_state=42) 
         elif string_model == 'SVM':
             self.str_model=string_model
-            self.model = OneClassSVM(gamma='auto')  # 7 parameters
+            self.model = OneClassSVM(gamma='auto')  
         elif string_model == 'LOF':
             self.str_model=string_model
-            self.model = LocalOutlierFactor() # 8 parameters some useless
+            self.model = LocalOutlierFactor() 
         elif string_model == 'PCA':
             self.str_model=string_model
-            self.model = PCA(n_components=4) # 3 parameters only bool
+            self.model = PCA(n_components=4)
         else:
             raise ValueError('Model name not recognized')
       except ValueError as e:
@@ -136,18 +137,29 @@ Explained variance for shape [16]_[10, 11, 41]: 0.6690677713468111
     self.model.add(Lambda(lambda x: x, output_shape=lambda s: s))
      
 
+  
+  def suitable_conv(self, filters, ker_str, dense, input):
+        # Convolution
+        encoded = tf.keras.layers.Conv1D(filters=filters, kernel_size=ker_str, strides=ker_str, activation='relu', padding='same')(input)
+        # Downsampling
+        encoded_fc1 = tf.keras.layers.Dense(dense, activation='relu')(encoded)
+        encoded_fc2 = tf.keras.layers.Dense(dense, activation='relu')(encoded_fc1)
+        # Deconvolution    
+        decoded = tf.keras.layers.Conv1DTranspose(1, kernel_size=ker_str, strides=ker_str,  activation='relu', padding='same')(encoded_fc2)
+        return decoded
+
   def create_deep_model(self, string_model):
     try:
       if string_model == 'conv1d':
-        self.str_model=string_model + f"_32_filters_2_layer"
-        self.model = keras.Sequential([
-          Conv1D(filters=64, kernel_size=(4), strides=4, activation='relu', padding='same', input_shape=(self.tuple_prod(self.spatial_indices), 1)),
-          Conv1D(filters=32, kernel_size=(6), strides=6, activation='relu', padding='same'),
-          Conv1D(filters=16, kernel_size=(8), strides=8, activation='relu', padding='same'),
-          Flatten(),
-          Dense((self.df.shape[1]), activation='linear'),
-          Lambda(lambda x: x, output_shape=lambda s: s) 
-    ])
+        self.str_model=string_model + f"_nodes_20"
+        input= [self.tuple_prod(self.spatial_indices), 1]
+        input_img = keras.layers.Input(shape=input)
+        if len(self.spatial_indices) == 1:
+          self.model = keras.models.Model(input_img, self.suitable_conv(filters=2, ker_str=int(self.spatial_indices[0]/2), dense=20, input=input_img))
+        else:
+          self.model = keras.models.Model(input_img, self.suitable_conv(filters=2, ker_str=self.spatial_indices[0], dense=20, input=input_img))
+        
+
         
       elif string_model == 'conv2d':
         self.str_model=string_model
@@ -221,9 +233,12 @@ Explained variance for shape [16]_[10, 11, 41]: 0.6690677713468111
 
   def fit_deep_model(self):
     self.model.compile(optimizer='adam', loss='mean_squared_error')
-    history= self.model.fit(self.df, self.df, epochs=self.tuple_prod(self.spatial_indices), batch_size=32, validation_split=0.1, verbose=1)
+    if self.tuple_prod(self.spatial_indices) < 160:
+      history= self.model.fit(self.df, self.df, epochs=150, batch_size=32, validation_split=0.1, verbose=1)
+    else:
+      history= self.model.fit(self.df, self.df, epochs=self.tuple_prod(self.spatial_indices), batch_size=32, validation_split=0.1, verbose=1)
     plot_history(history)
-    plt.savefig(f'hyperopt_conv1d_{self.xlsx_path}/training_model_{self.str_model}_{self.temporal_indices}_{self.spatial_indices}.png')
+    plt.savefig(f'final_validation_autoencoder_{self.xlsx_path}/training_model_{self.str_model}_{self.temporal_indices}_{self.spatial_indices}.png')
     plt.close()
 
 
@@ -236,14 +251,15 @@ Explained variance for shape [16]_[10, 11, 41]: 0.6690677713468111
 
   def deep_anomalies(self):
     self.fit_deep_model()
-    reconstructed = self.model.predict(self.df)
+    reconstructed = (self.model.predict(self.df)).reshape(self.df.shape)
+    print(reconstructed.shape)
     mse = np.mean(np.power(self.df - reconstructed, 2), axis=1)
     threshold = np.percentile(mse, 100 - 10)
     anomalies_idx = np.where(mse > threshold)[0]
     self.anomalies_indices = anomalies_idx[np.argsort(mse[anomalies_idx])[::-1]]
 
 
-  def anomalies_sup(self):
+  def anomalies_stat(self):
     anomaly_percentage = 0.1  # 10%
 
 
@@ -299,7 +315,7 @@ Explained variance for shape [16]_[10, 11, 41]: 0.6690677713468111
   def save_linear_anomaly_indices(self):
       # divido l'indice dell'anomalia per uno degli indici temporali, poi trovo l'intero piu vicino e ho fatto teoricamente
 
-    with open(f'hyperopt_conv1d_{self.xlsx_path}/anomalies_{self.str_model}_{self.temporal_indices}_{self.spatial_indices}.txt', 'w') as file:
+    with open(f'final_validation_autoencoder_{self.xlsx_path}/anomalies_{self.str_model}_{self.temporal_indices}_{self.spatial_indices}.txt', 'w') as file:
         for indice in self.anomalies_indices:
           
           if len(self.temporal_indices) == 2:
@@ -330,24 +346,24 @@ Explained variance for shape [16]_[10, 11, 41]: 0.6690677713468111
             self.reshape_linear_tensor(temporal_indices, spatial_indices, standardize=True)
             explained_graph_variances.append(self.PCA_graph())
             if self.str_model == 'PCA':
-                if temporal_indices == [42]:
+                if temporal_indices == [41]:
                     self.variance_components= variance_txt[0]
-                elif temporal_indices == [42, 11]:
+                elif temporal_indices == [41, 11]:
                     self.variance_components = variance_txt[1]
-                elif temporal_indices == [42, 11, 12]:
+                elif temporal_indices == [41, 11, 10]:
                     self.variance_components = variance_txt[2]
-                elif temporal_indices == [42, 11, 16]:
+                elif temporal_indices == [41, 11, 16]:
                     self.variance_component = variance_txt[3]
-                elif temporal_indices == [16, 12]:
+                elif temporal_indices == [16, 10]:
                     self.variance_components = variance_txt[4]
-                elif temporal_indices == [12]:
+                elif temporal_indices == [10]:
                     self.variance_components = variance_txt[5]
                 elif temporal_indices == [16]:
                     self.variance_components = variance_txt[6]
                 self.create_PCA()
                 self.fit_model()
                 variances.write(f"Explained variance for shape {temporal_indices}_{spatial_indices}: {np.sum(self.model.explained_variance_ratio_)}\n")
-            self.anomalies_sup()
+            self.anomalies_stat()
             self.save_linear_anomaly_indices()
 
             
@@ -425,20 +441,30 @@ Explained variance for shape [16]_[10, 11, 41]: 0.6690677713468111
     loadings = pca.components_.T * np.sqrt(pca.explained_variance_)
     t_squared = np.sum((scores[:, :self.PCA_Ncomponents] / np.sqrt(pca.explained_variance_))**2, axis=1)
     q_residuals = np.sum(self.df**2 - np.dot(scores, loadings.T)**2, axis=1)
-
-    fig, axs = plt.subplots(1, 3, figsize=(18, 6))
+    fig, axs = plt.subplots(1, 3, figsize=(22, 8))
     plt.rcParams.update({'font.size': 15})
     axs[0].scatter(scores[:, 0], scores[:, 1], color='lightblue', edgecolors='black')
-    axs[0].set_xlabel('PC1')
-    axs[0].set_ylabel('PC2')
+    axs[0].set_xlabel(f'PC1: {round(explained_variances[0], 3)*100}%')
+    axs[0].set_ylabel(f'PC2: {round(explained_variances[1]-explained_variances[0], 3)*100}%')
+    axs[0].set_xlim([-4, 4])
+    axs[0].set_ylim([-4, 4])
     axs[0].axhline(y=0, linestyle='dashed', color='red')
     axs[0].axvline(x=0, linestyle='dashed', color='red')
     axs[0].set_title('Scores Plot')
 
+    # ONly for the article
 
-    axs[1].plot(range(self.tuple_prod(self.spatial_indices)), loadings[:, 0], label='PC1')
-    axs[1].plot(range(self.tuple_prod(self.spatial_indices)), loadings[:, 1], label='PC2')
-    axs[1].set_xlabel('Loadings')
+    if self.temporal_indices == [16, 10]:
+      axs[1].plot((range(451)), loadings[:, 0], label='PC1')
+      axs[1].plot((range(451)), loadings[:, 1], label='PC2')
+      axs[1].set_xticks(ticks=(range(451)[::150]), labels=self.timestamp[::150], rotation=20)
+      axs[1].set_xlabel('Time')
+
+
+    else:
+      axs[1].plot(range(self.tuple_prod(self.spatial_indices)), loadings[:, 0], label='PC1')
+      axs[1].plot(range(self.tuple_prod(self.spatial_indices)), loadings[:, 1], label='PC2')
+      axs[1].set_xlabel('Loadings')
     axs[1].set_ylabel('Variables')
     axs[1].axhline(y=0, linestyle='dashed', color='red')
     axs[1].axvline(x=0, linestyle='dashed', color='red')
@@ -509,25 +535,19 @@ class printer():
     self.xlsx_path=path
     for sheet_num in range(sens_num):  # Change to range(18) when you have all
             sheet_df = pd.read_excel(path, sheet_name=sheet_num)
-            
             sheet_df = sheet_df.drop(['Unnamed: 0', 'off_ch1', 'off_ch2', 'off_ch3', 'off_ch4'], axis=1)
             self.df.append(sheet_df)
-
-
 
   def print_all(self):
     sns.set_style('darkgrid')
     cmap = plt.get_cmap('rainbow')
     normalize = Normalize(vmin=0, vmax=15)
-
     for i in tqdm(range(len(self.df)), desc="Elaborazione"):
         plt.figure(figsize=(15,10))
         plt.rcParams.update({'font.size': 15})
-
         for idx, col in enumerate(self.df[i].iloc[:, 2:].columns):
             color = cmap(normalize(idx))
             plt.plot(self.df[i]['timestamp'], self.df[i][col], label=col, color=color)
-
         plt.title(self.df[i]['sensor'].iloc[0])
         plt.xlabel('Time', fontsize=20)
         plt.ylabel('Intensity', fontsize=20)
