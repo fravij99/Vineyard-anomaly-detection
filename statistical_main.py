@@ -45,13 +45,12 @@ possible_shapes=[
 ([41, 11, 16], [10]),	# anomalia di singolo canale in un determinato timepoint
 ([16, 10], [41, 11]),   # anomalia di singolo canale continuata nel tempo
 ([10], [41, 11, 16]),	# anomalia di singolo sensore continuata nel tempo
-([16], [10, 11, 41]), 	# anomalia di singolo canale per tutti i sensori
-]
+([16], [10, 11, 41]),
+ 	] 	# anomalia di singolo canale per tutti i sensorimi
 
-possible_models={'IsolationForest'}  #'PCA', 'KMeans', 'SVM', 'LOF', 'IsolationForest' 
-det=detectorlib.detector()
-
+det = detectorlib()
 det.load_preprocess(path3, 12)
+possible_models={'PCA, SVM, IsolationForest, LOF, KMeans'}
 
 
 for model in tqdm(possible_models, desc="Creating models"):
