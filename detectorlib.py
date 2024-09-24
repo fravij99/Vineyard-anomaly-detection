@@ -11,6 +11,7 @@ from sklearn.ensemble import IsolationForest
 from sklearn.svm import OneClassSVM
 from sklearn.cluster import KMeans
 import keras
+import random
 import keras.layers
 from keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Lambda, Reshape, LSTM, GRU, Conv1D, Conv3D, MaxPooling1D, MaxPooling3D, Conv1DTranspose
 from sklearn.neighbors import LocalOutlierFactor
@@ -18,7 +19,10 @@ from datetime import timedelta
 from matplotlib.colors import Normalize
 from plot_keras_history import plot_history
 import tensorflow as tf
+import matplotlib.dates as mdates
+import matplotlib
 '''In this class we have to set the local variables to assign ath every index of our notations'''
+'''This '''
 class detector():
 
   '''                                                                                        
@@ -48,11 +52,92 @@ Explained variance for shape [16]_[10, 11, 41]: 0.6690677713468111
             sheet_df = sheet_df.drop(['Unnamed: 0', 'timestamp', 'sensor', 'off_ch1', 'off_ch2', 'off_ch3', 'off_ch4'], axis=1)
             self.df.append(sheet_df)
             
-        
         self.df = np.array(self.df)
         self.df = np.nan_to_num(self.df)
         self.df = (self.df - self.df.min()) / (self.df.max() - self.df.min())
         self.df = self.df.transpose(1, 0, 2)
+
+  '''This function is need to trat random matrix generated in the main in order to verify herarchical relationships between anomaly classes'''
+  def random_matrix_loading(self):
+
+    self.randmatrix = np.random.rand(1000, 40000)
+    self.df= self.randmatrix
+    possible_shapes=[([self.randmatrix.shape[0]], [int(self.randmatrix.shape[1]/20), 20]), 
+                     ([self.randmatrix.shape[0], int(self.randmatrix.shape[1]/20)], [20]),
+                     ([self.randmatrix.shape[0], 20], [int(self.randmatrix.shape[1]/20)])]
+    possible_models={'PCA'}
+    self.xlsx_path='Random_matrix_trial.xlsx'
+    for model in tqdm(possible_models, desc="Creating models"):
+      self.create_statistical_model(model)
+      plt.imshow(self.df, cmap='hot', interpolation='nearest')
+      plt.show()
+
+      # Per la rete neurale, anche l'ordine in cui inserisco le dimensioni risulta essere importante
+      self.stamp_all_shape_anomalies(possible_shapes)
+
+
+  def random_walk(self, length, dim=1):
+    dir_array = np.random.randint(dim, size=length)
+    updown_array = np.random.choice([-1, 1], size=length)
+
+    steps = np.zeros((length, dim))
+    steps[np.arange(length), dir_array] = updown_array
+
+    pos = np.cumsum(steps, axis=0).reshape(-1)
+
+    return (pos/(pos.max()))
+
+
+  '''This function generates some statistical distribution infecting them with noise anomalies on several hierarchic levels and launches PCA to extract from the more grain to the more fine anomaly'''
+  def random_anomalies_generation(self, input_size):
+    self.randexp=self.random_exp_generator(input_size)
+    peak_width = int(0.1 * len(self.randexp))  
+    
+    # Random walk generation, filling the trajectory with random zeros to have sporadic random small anomalies
+    self.randomwalk = self.random_walk(len(self.randexp), dim=1)
+    index_zero=random.sample(range(len(self.randomwalk)), int(len(self.randomwalk)-peak_width))
+    self.randomwalk[index_zero]=0
+
+    for i in range(len(self.randexp)):
+        self.randexp[i] += self.randomwalk[i]*0.1
+
+    return self.randexp
+  
+  def random_exp_generator(self, input_size):
+    randexp = np.exp(np.arange(0, input_size)/(input_size*0.05))
+    randexp = randexp / max(randexp)
+    return randexp
+  
+  '''This function generates some statistical distribution infecting them localize gaussian anomalies'''
+  def random_big_anomalies_generation(self, input_size):
+    self.randexp = self.random_exp_generator(input_size)
+    peak_width = int(0.1 * len(self.randexp))  
+    self.gauss_err = 0.5*np.exp(-np.power((np.arange(0, peak_width)), 2.)/float(peak_width*100))  
+    peak_start = 650
+
+    for i in range(len(self.gauss_err)):
+        self.randexp[peak_start + i] += self.gauss_err[i]
+
+    return self.randexp
+  
+  def random_complete_anomalies_generation(self, input_size):
+    self.randexp = np.exp(np.arange(0, input_size)/(input_size*0.05))
+    self.randexp = self.randexp / max(self.randexp)
+    peak_width = int(0.1 * len(self.randexp))  
+    self.gauss_err = 0.5*np.exp(-np.power((np.arange(0, peak_width)), 2.)/float(peak_width*100))  
+    peak_start = 650 #np.random.randint(0, len(self.randexp) - peak_width)
+    
+    # Random walk generation, filling the trajectory with random zeros to have sporadic random small anomalies
+    self.randomwalk = self.random_walk(len(self.randexp), dim=1)
+    index_zero=random.sample(range(len(self.randomwalk)), int(len(self.randomwalk)-peak_width))
+    self.randomwalk[index_zero]=0
+
+    for i in range(len(self.randexp)):
+        self.randexp[i] += self.randomwalk[i]*0.1
+    for i in range(len(self.gauss_err)):
+        self.randexp[peak_start + i] += self.gauss_err[i]
+
+    return self.randexp
 
 
   '''Given the desired index from the main, it reshape the df into a tensor as the user wants'''
@@ -113,6 +198,7 @@ Explained variance for shape [16]_[10, 11, 41]: 0.6690677713468111
         print(f"Error creating model: {e}")
         return None
 
+
   def create_PCA(self):
     explained_variances=[]
 
@@ -148,6 +234,7 @@ Explained variance for shape [16]_[10, 11, 41]: 0.6690677713468111
         decoded = tf.keras.layers.Conv1DTranspose(1, kernel_size=ker_str, strides=ker_str,  activation='relu', padding='same')(encoded_fc2)
         return decoded
 
+
   def create_deep_model(self, string_model):
     try:
       if string_model == 'conv1d':
@@ -158,8 +245,6 @@ Explained variance for shape [16]_[10, 11, 41]: 0.6690677713468111
           self.model = keras.models.Model(input_img, self.suitable_conv(filters=2, ker_str=int(self.spatial_indices[0]/2), dense=20, input=input_img))
         else:
           self.model = keras.models.Model(input_img, self.suitable_conv(filters=2, ker_str=self.spatial_indices[0], dense=20, input=input_img))
-        
-
         
       elif string_model == 'conv2d':
         self.str_model=string_model
@@ -313,9 +398,9 @@ Explained variance for shape [16]_[10, 11, 41]: 0.6690677713468111
 
 
   def save_linear_anomaly_indices(self):
-      # divido l'indice dell'anomalia per uno degli indici temporali, poi trovo l'intero piu vicino e ho fatto teoricamente
+      # divido l'indice dell'anomalia per uno degli indici temporali, poi trovo l'intero piu vicino e ho fatto teoricamente  f'final_validation_autoencoder_{self.xlsx_path}
 
-    with open(f'final_validation_autoencoder_{self.xlsx_path}/anomalies_{self.str_model}_{self.temporal_indices}_{self.spatial_indices}.txt', 'w') as file:
+    with open(f'{self.xlsx_path}/anomalies_{self.str_model}_pruned_{self.temporal_indices}_{self.spatial_indices}.txt', 'w') as file:
         for indice in self.anomalies_indices:
           
           if len(self.temporal_indices) == 2:
@@ -327,16 +412,15 @@ Explained variance for shape [16]_[10, 11, 41]: 0.6690677713468111
           file.write(f"{indice}\n")
 
 
-  def stamp_all_shape_anomalies(self, possible_shapes):
+  def stamp_all_shape_anomalies_PCA(self, possible_shapes):
     variance_txt=[0.8681266505022884, 
                             0.8632755943305828, 
                             0.9531381520347932, 
                             0.9067262065543965, 
                             0.3582718491728941, 
-                            0.8149863586217296, 
+                            0.7549863586217296, 
                             0.6690677713468111]
     colors = plt.get_cmap('tab10').colors
-    
     i=0
     explained_graph_variances=[]
     plt.figure(figsize=(9,6))
@@ -346,20 +430,21 @@ Explained variance for shape [16]_[10, 11, 41]: 0.6690677713468111
             self.reshape_linear_tensor(temporal_indices, spatial_indices, standardize=True)
             explained_graph_variances.append(self.PCA_graph())
             if self.str_model == 'PCA':
-                if temporal_indices == [41]:
+                if temporal_indices == [42]:
                     self.variance_components= variance_txt[0]
-                elif temporal_indices == [41, 11]:
+                elif temporal_indices == [42, 11]:
                     self.variance_components = variance_txt[1]
-                elif temporal_indices == [41, 11, 10]:
+                elif temporal_indices == [42, 11, 12]:
                     self.variance_components = variance_txt[2]
-                elif temporal_indices == [41, 11, 16]:
+                elif temporal_indices == [42, 11, 16]:
                     self.variance_component = variance_txt[3]
-                elif temporal_indices == [16, 10]:
+                elif temporal_indices == [16, 12]:
                     self.variance_components = variance_txt[4]
-                elif temporal_indices == [10]:
+                elif temporal_indices == [12]:
                     self.variance_components = variance_txt[5]
                 elif temporal_indices == [16]:
                     self.variance_components = variance_txt[6]
+                
                 self.create_PCA()
                 self.fit_model()
                 variances.write(f"Explained variance for shape {temporal_indices}_{spatial_indices}: {np.sum(self.model.explained_variance_ratio_)}\n")
@@ -376,10 +461,16 @@ Explained variance for shape [16]_[10, 11, 41]: 0.6690677713468111
 
 
             i=i+1
-    plt.savefig(f'All_variances_in_a_graph')
+    plt.savefig(f'All_variances_in_a_graph_2020_TN')
     plt.close()
     self.PCA_graph()
 
+
+  def stamp_all_shape_anomalies(self, possible_shapes):
+      for temporal_indices, spatial_indices in tqdm(possible_shapes, desc="Stamping shape anomalies"):
+            self.reshape_linear_tensor(temporal_indices, spatial_indices, standardize=False)
+            self.anomalies_stat()
+            self.save_linear_anomaly_indices()
 
   
   def stamp_all_shape_deep_anomalies(self, possible_shapes, model):
@@ -483,6 +574,14 @@ Explained variance for shape [16]_[10, 11, 41]: 0.6690677713468111
     plt.tight_layout()
     plt.close()
     return explained_variances
+  
+  def pruning(self, window):
+    self.df=self.df[:-window]
+    return self.df
+     
+  def antipruning(self, window):
+     self.df=self.df[-window:]
+     return self.df
     
 
 
@@ -535,7 +634,7 @@ class printer():
     self.xlsx_path=path
     for sheet_num in range(sens_num):  # Change to range(18) when you have all
             sheet_df = pd.read_excel(path, sheet_name=sheet_num)
-            sheet_df = sheet_df.drop(['Unnamed: 0', 'off_ch1', 'off_ch2', 'off_ch3', 'off_ch4'], axis=1)
+            sheet_df = sheet_df.drop(['Unnamed: 0', 'off_ch1', 'off_ch2', 'off_ch3', 'off_ch4', 'timestamp'], axis=1)
             self.df.append(sheet_df)
 
   def print_all(self):
@@ -548,9 +647,40 @@ class printer():
         for idx, col in enumerate(self.df[i].iloc[:, 2:].columns):
             color = cmap(normalize(idx))
             plt.plot(self.df[i]['timestamp'], self.df[i][col], label=col, color=color)
-        plt.title(self.df[i]['sensor'].iloc[0])
-        plt.xlabel('Time', fontsize=20)
-        plt.ylabel('Intensity', fontsize=20)
+        plt.title(self.df[i]['sensor'].iloc[0], fontsize=25)
+        plt.xlabel('Time', fontsize=25)
+        plt.ylabel('Intensity', fontsize=25)
+        plt.xticks(fontsize=20, rotation=17)
+        plt.yticks(fontsize=20)
         plt.legend()
         plt.savefig(f'graphs {self.xlsx_path}/sensor_{self.df[i]["sensor"].iloc[0]}.png')
         plt.close()
+
+
+  def hitmap(self):
+
+
+    data1 = (np.random.randint(low=1, high=200, size=(10, 10))/200).round(2)
+    data2 = (np.random.randint(low=1, high=200, size=(10, 10))/200).round(2)
+    data3 = (np.random.randint(low=1, high=200, size=(10, 10))/200).round(2)
+    data4 = (np.random.randint(low=1, high=200, size=(10, 10))/200).round(2)
+    
+
+
+    # Crea e salva le heatmap
+    plt.figure(figsize=(8, 6))
+    sns.heatmap(data1, annot=True, cbar=False)
+    plt.savefig('photos/hitmap1.png')
+    plt.clf()
+
+    sns.heatmap(data2, annot=True, cbar=False)
+    plt.savefig('photos/hitmap2.png')
+    plt.clf()
+
+    sns.heatmap(data3, annot=True, cbar=False)
+    plt.savefig('photos/hitmap3.png')
+    plt.clf()
+
+    sns.heatmap(data4, annot=True, cbar=False)
+    plt.savefig('photos/hitmap4.png')
+    plt.clf()
