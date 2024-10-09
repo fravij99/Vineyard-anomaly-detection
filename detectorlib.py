@@ -20,20 +20,10 @@ from matplotlib.colors import Normalize
 from plot_keras_history import plot_history
 import tensorflow as tf
 import matplotlib.dates as mdates
-import matplotlib
+import matplotlib as mpl
 '''In this class we have to set the local variables to assign ath every index of our notations'''
 '''This '''
 class detector():
-
-  '''                                                                                        
-Explained variance for shape [41]_[11, 16, 10]: 0.8681266505022884
-Explained variance for shape [41, 11]_[16, 10]: 0.8632755943305828
-Explained variance for shape [41, 11, 10]_[16]: 0.9531381520347932
-Explained variance for shape [41, 11, 16]_[10]: 0.9067262065543965
-Explained variance for shape [16, 10]_[41, 11]: 0.3582718491728941
-Explained variance for shape [10]_[41, 11, 16]: 0.8149863586217296
-Explained variance for shape [16]_[10, 11, 41]: 0.6690677713468111
-'''
   
   def tuple_prod(self, tuple):
     prod = 1
@@ -56,89 +46,6 @@ Explained variance for shape [16]_[10, 11, 41]: 0.6690677713468111
         self.df = np.nan_to_num(self.df)
         self.df = (self.df - self.df.min()) / (self.df.max() - self.df.min())
         self.df = self.df.transpose(1, 0, 2)
-
-  '''This function is need to treats random matrix generated in the main in order to verify herarchical relationships between anomaly classes'''
-  def random_matrix_loading(self):
-
-    self.randmatrix = np.random.rand(1000, 40000)
-    self.df= self.randmatrix
-    possible_shapes=[([self.randmatrix.shape[0]], [int(self.randmatrix.shape[1]/20), 20]), 
-                     ([self.randmatrix.shape[0], int(self.randmatrix.shape[1]/20)], [20]),
-                     ([self.randmatrix.shape[0], 20], [int(self.randmatrix.shape[1]/20)])]
-    possible_models={'PCA'}
-    self.xlsx_path='Random_matrix_trial.xlsx'
-    for model in tqdm(possible_models, desc="Creating models"):
-      self.create_statistical_model(model)
-      plt.imshow(self.df, cmap='hot', interpolation='nearest')
-      plt.show()
-
-      # Per la rete neurale, anche l'ordine in cui inserisco le dimensioni risulta essere importante
-      self.stamp_all_shape_anomalies(possible_shapes)
-
-
-  def random_walk(self, length, dim=1):
-    dir_array = np.random.randint(dim, size=length)
-    updown_array = np.random.choice([-1, 1], size=length)
-
-    steps = np.zeros((length, dim))
-    steps[np.arange(length), dir_array] = updown_array
-
-    pos = np.cumsum(steps, axis=0).reshape(-1)
-
-    return (pos/(pos.max()))
-
-
-  '''This function generates some statistical distribution infecting them with noise anomalies on several hierarchic levels'''
-  def random_anomalies_generation(self, input_size):
-    self.randexp=self.random_exp_generator(input_size)
-    peak_width = int(0.1 * len(self.randexp))  
-    
-    # Random walk generation, filling the trajectory with random zeros to have sporadic random small anomalies
-    self.randomwalk = self.random_walk(len(self.randexp), dim=1)
-    index_zero=random.sample(range(len(self.randomwalk)), int(len(self.randomwalk)-peak_width))
-    self.randomwalk[index_zero]=0
-
-    for i in range(len(self.randexp)):
-        self.randexp[i] += self.randomwalk[i]*0.1
-
-    return self.randexp
-  
-  '''Generates a synthetic dataset following an exponential distribution'''
-  def random_exp_generator(self, input_size):
-    randexp = np.exp(np.arange(0, input_size)/(input_size*0.05))
-    randexp = randexp / max(randexp)
-    return randexp
-  
-  '''This function generates some statistical distribution infecting them localize gaussian anomalies'''
-  def random_big_anomalies_generation(self, input_size):
-    self.randexp = self.random_exp_generator(input_size)
-    peak_width = int(0.1 * len(self.randexp))  
-    self.gauss_err = 0.5*np.exp(-np.power((np.arange(0, peak_width)), 2.)/float(peak_width*100))  
-    peak_start = 650
-
-    for i in range(len(self.gauss_err)):
-        self.randexp[peak_start + i] += self.gauss_err[i]
-
-    return self.randexp
-  
-  def random_complete_anomalies_generation(self, input_size):
-    self.randexp = np.exp(np.arange(0, input_size)/(input_size*0.05))
-    self.randexp = self.randexp / max(self.randexp)
-    peak_width = int(0.1 * len(self.randexp))  
-    self.gauss_err = 0.5*np.exp(-np.power((np.arange(0, peak_width)), 2.)/float(peak_width*100))  
-    peak_start = 650 #np.random.randint(0, len(self.randexp) - peak_width)
-    
-    # Random walk generation, filling the trajectory with random zeros to have sporadic random small anomalies
-    self.randomwalk = self.random_walk(len(self.randexp), dim=1)
-    index_zero=random.sample(range(len(self.randomwalk)), int(len(self.randomwalk)-peak_width))
-    self.randomwalk[index_zero]=0
-
-    for i in range(len(self.randexp)):
-        self.randexp[i] += self.randomwalk[i]*0.1
-    for i in range(len(self.gauss_err)):
-        self.randexp[peak_start + i] += self.gauss_err[i]
-
-    return self.randexp
 
 
   '''Given the desired index from the main, it reshape the df into a tensor as the user wants'''
@@ -163,18 +70,21 @@ Explained variance for shape [16]_[10, 11, 41]: 0.6690677713468111
   
   '''You have to pass the indices without zeros'''
   # devi cambiare tutte le volte la shape da cui parti per essere sicuro
-  def reshape_linear_tensor(self, temporal_indices, spatial_indices, standardize=False):
+  def reshape_linear_tensor(self, temporal_indices, spatial_indices, standardize, df_calibration):
 
     self.temporal_indices = temporal_indices
     self.spatial_indices = spatial_indices
     self.df = np.array(self.df.reshape(self.tuple_prod(temporal_indices), self.tuple_prod(spatial_indices)))
-    if standardize == True:
+    #if standardize == True:
+      #self.standardize(df_calibration)
 
-      mean = np.mean(self.df, axis=0)
-      std_dev = np.std(self.df, axis=0)
+
+  def standardize(self, df): 
+      mean = np.mean(df, axis=0)
+      std_dev = np.std(df, axis=0)
       self.df = (self.df - mean)/(std_dev)
-      self.df = (self.df - self.df.min()) / (self.df.max() - self.df.min())
-          
+      
+
 
   def create_statistical_model(self, string_model):
       try:
@@ -475,13 +385,11 @@ Explained variance for shape [16]_[10, 11, 41]: 0.6690677713468111
 
   
   def stamp_all_shape_deep_anomalies(self, possible_shapes, model):
-
       for temporal_indices, spatial_indices in tqdm(possible_shapes, desc="Stamping shape anomalies"):
         self.reshape_linear_tensor(temporal_indices, spatial_indices)
         self.create_deep_model(model)
         self.deep_anomalies()
         self.save_linear_anomaly_indices()
-
 
 
   def hyperopt_anomalies(self, possible_shapes, model, possible_combinations):
@@ -497,7 +405,6 @@ Explained variance for shape [16]_[10, 11, 41]: 0.6690677713468111
 
 
   def t_sq_q_red(self):
-
     self.PCA_Ncomponents=2
     sns.set_style('darkgrid')
     self.pca = PCA(n_components=self.PCA_Ncomponents)
@@ -514,26 +421,44 @@ Explained variance for shape [16]_[10, 11, 41]: 0.6690677713468111
     return scores, t_squared, q_residuals
   
   def t_q_graph(self, scores, t_squared, q_residuals, threshold):
-    fig, axs = plt.subplots(1, 2, figsize=(22, 8))
-    plt.rcParams.update({'font.size': 15})
-    axs[0].scatter(scores[:, 0], scores[:, 1], color='lightblue', edgecolors='black')
+    fig, axs = plt.subplots(1, 3, figsize=(22, 10))
+    plt.rcParams.update({'font.size': 12})
+    n_points = scores.shape[0]
+    indices = np.arange(n_points)
+    scatter=axs[0].scatter(scores[:, 0], scores[:, 1], c=indices)
     axs[0].set_xlabel(f'PC1')
     axs[0].set_ylabel(f'PC2')
-    axs[0].set_xlim([-1, 1])
-    axs[0].set_ylim([-1, 1])
     axs[0].axhline(y=0, linestyle='dashed', color='red')
     axs[0].axvline(x=0, linestyle='dashed', color='red')
     axs[0].set_title('Scores Plot')
 
-    axs[1].scatter(t_squared, q_residuals, color='lightblue', edgecolors='black')
-    axs[1].axvline(x=threshold[0], color='red', linestyle='--', label='LAB T-squared 95% Threshold')
-    axs[1].axhline(y=threshold[1], color='red', linestyle='--', label='LAB Q Residuals 95% Threshold')
-    axs[1].set_xlabel('T-squared (t^2)')
-    axs[1].set_ylabel('Q Residuals')
-    axs[1].set_title('T-squared vs Q Residuals')
+    
+    loadings = self.pca.components_.T
+    features = ['530_ch1',	'530_ch2',	'530_ch3',	'530_ch4',	'630_ch1',	'630_ch2',	'630_ch3',	'630_ch4',	
+                '690_ch1',	'690_ch2',	'690_ch3',	'690_ch4',	'730_ch1',	'730_ch2',	'730_ch3',	'730_ch4']
+    axs[1].plot(features, loadings[:, 0], label='PC1', c='red')
+    axs[1].plot(features, loadings[:, 1], label='PC2', c='orange')
+    axs[1].set_xlabel('Channels')
+    axs[1].set_ylabel('Loadings')
+    axs[1].set_xticklabels(features, rotation=45)
+    axs[1].set_title('Loadings')
     axs[1].legend()
 
-    plt.savefig(f'graphs_variance_PCA_grape_article/scores_vs_loadings_field_projected')
+    scatter=axs[2].scatter(t_squared, q_residuals, c=indices)
+    axs[2].axvline(x=threshold[0], color='red', linestyle='--', label='LAB T-squared 95% Threshold')
+    axs[2].axhline(y=threshold[1], color='red', linestyle='--', label='LAB Q Residuals 95% Threshold')
+    axs[2].set_xlabel('T-squared (t^2)')
+    axs[2].set_ylabel('Q Residuals')
+    axs[2].set_title('T-squared vs Q Residuals')
+    axs[2].legend()
+
+    cbar1=plt.colorbar(scatter, ax=axs[0], orientation="horizontal")
+    cbar2=plt.colorbar(scatter, ax=axs[2], orientation="horizontal")
+    cbar1.set_label('Time')
+    cbar2.set_label('Time')
+
+    plt.savefig(f'graphs_variance_PCA_grape_article/scores_vs_loadings_laboratory')
+    plt.show()
     plt.tight_layout()
     plt.close()  
 
@@ -560,15 +485,7 @@ Explained variance for shape [16]_[10, 11, 41]: 0.6690677713468111
     mask = mask_t & mask_q
     filtered_data = self.df[mask]
     return filtered_data
-  
-  def pruning(self, window):
-    self.df=self.df[:-window]
-    return self.df
-     
-  def antipruning(self, window):
-     self.df=self.df[-window:]
-     return self.df
-    
+      
 
 
 class sheet:

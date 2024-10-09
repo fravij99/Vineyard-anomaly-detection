@@ -49,22 +49,30 @@ possible_shapes=[
 ([16], [10, 11, 41]),
  	] 	# anomalia di singolo canale per tutti i sensorimi
 
+#possible_models={['PCA']}
+
+
 det = detectorlib.detector()
 det.load_preprocess(path4, 1)
+df_calibration=det.df
+print(det.df.min())
+det.standardize(df_calibration)
 det.df=np.squeeze(det.df)
 
 scores, t_sq, q_red=det.t_sq_q_red()
 threshold=det.calculate_percentile_thresholds()
 det.t_q_graph(scores, t_sq, q_red, threshold)
-
-
-"""det.load_preprocess(path3, 12)
-det.reshape_linear_tensor([42, 11, 12], [16])
-
+print(t_sq.min(), q_red.min())
+'''det.load_preprocess(path3, 12)
+det.reshape_linear_tensor([42, 11, 12], [16], True, df_calibration)
+det.df=np.squeeze(det.df)
 params=det.project_pca(threshold)
 filtered_data=det.eliminate_anomalies(threshold)
 
-print(det.df.shape, filtered_data.shape)"""
+print(det.df.shape, filtered_data.shape)'''
+
+
+
 """for model in tqdm(possible_models, desc="Creating models"):
     det.create_statistical_model(model)
     # Per la rete neurale, anche l'ordine in cui inserisco le dimensioni risulta essere importante
