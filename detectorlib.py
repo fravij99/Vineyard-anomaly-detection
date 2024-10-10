@@ -75,11 +75,15 @@ class detector():
     self.temporal_indices = temporal_indices
     self.spatial_indices = spatial_indices
     self.df = np.array(self.df.reshape(self.tuple_prod(temporal_indices), self.tuple_prod(spatial_indices)))
-    #if standardize == True:
-      #self.standardize(df_calibration)
+    if standardize == False:
+      self.standardize(df_calibration)
 
 
   def standardize(self, df): 
+      df[df==0]=10e-15
+      self.df[self.df==0]=10e-15
+      df = np.log10(df)
+      self.df = np.log10(self.df)
       mean = np.mean(df, axis=0)
       std_dev = np.std(df, axis=0)
       self.df = (self.df - mean)/(std_dev)
@@ -413,10 +417,10 @@ class detector():
     # devo calcolare i loadings
     loadings = self.pca.components_.T * np.sqrt(self.pca.explained_variance_)
     t_squared = np.sum((scores[:, :self.PCA_Ncomponents] / np.sqrt(self.pca.explained_variance_))**2, axis=1)
-    q_residuals = np.sum(self.df**2 - np.dot(scores, loadings.T)**2, axis=1)
-    self.scores=scores
-    self.t_squared=t_squared
-    self.q_residuals=q_residuals
+    q_residuals = np.sum((self.df - np.dot(scores, loadings.T))**2, axis=1)
+    self.scores = scores
+    self.t_squared = t_squared
+    self.q_residuals = q_residuals
 
     return scores, t_squared, q_residuals
   
